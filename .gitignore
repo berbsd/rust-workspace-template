@@ -80,10 +80,10 @@ Icon
 # `core.ignorecase` reason as AUDIT-*/TICKET-*/UI-* below.
 !/CHANGELOG.md
 !**/PULL_REQUEST_TEMPLATE.md
-# This workspace's own specs, plans and worked examples live in `docs/`, which
-# IS the source of truth here, so it is allowlisted rather than treated as
-# scratch (unlike a predecessor project whose specs lived in a separate repo).
-!docs/**/*.md
+# docs/plans/ and docs/specs/ are per-session scratch (design docs and plans
+# generated while working, not durable project docs), so they stay under the
+# blanket **/*.md ignore above. Each directory keeps a tracked .gitkeep so the
+# folder itself still exists in a fresh clone.
 # Audit reports at the repository root. A findings document whose
 # recommendations nobody can diff is not a finding, it is a note — and this one
 # was silently ignored for a whole commit before anybody noticed it was missing
