@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+# =============================================================================
+# bin/release — cut a tagged release with a git-cliff changelog and GitHub Release
+# =============================================================================
+# Usage:
+#   bin/release VERSION            # dry-run: prints the plan, changes nothing
+#   bin/release VERSION --execute  # performs the release for real
+#
+# VERSION is the new version number without a leading "v" (e.g. 0.2.0).
+#
+# Steps (only mutate anything with --execute):
+#   1. Validate preconditions: semver, clean working tree, on main, up to date
+#      with origin/main, tag not already used (locally or on origin).
+#   2. `just check` as a pre-flight gate.
+#   3. Bump [workspace.package] version in Cargo.toml (services inherit it via
+#      version.workspace = true — one line to change).
+#   4. Regenerate CHANGELOG.md via git-cliff, labeling the new section vVERSION.
+#   5. Commit, annotate-tag, push main and the tag.
+#   6. `gh release create` with the new CHANGELOG.md section as the notes body.
+#
+# Without --execute, every step is described but nothing on disk, in git, or
+# on GitHub changes — safe to run any time to preview what a release would do.
+# =============================================================================
+
+set -euo pipefail
+
+DRY_RUN=1
+VERSION=""
+
+die() {
+  echo "error: $1" >&2
+  exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --execute) DRY_RUN=0; shift ;;
+    -*) die "unknown flag: $1" ;;
+    *)
+      [[ -n "$VERSION" ]] && die "unexpected extra argument: $1"
+      VERSION="$1"
+      shift
+      ;;
+  esac
+done
+
+[[ -z "$VERSION" ]] && die "usage: bin/release VERSION [--execute]"
+[[ "$VERSION" == v* ]] && die "pass the version without a leading 'v' (e.g. 0.2.0, not v0.2.0)"
+[[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && die "VERSION must be semver X.Y.Z (got: $VERSION)"
+
+TAG="v$VERSION"
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+note() {
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "[dry-run] $1"
+  else
+    echo ">>> $1"
+  fi
+}
+
+run() {
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "[dry-run] would run: $*"
+  else
+    "$@"
+  fi
+}
+
+# Extracts just the new version's section from a git-cliff-generated
+# changelog file: from its "## [VERSION]" heading up to (not including) the
+# next "## [" heading, or end of file if it's the most recent release.
+extract_changelog_section() {
+  local version="$1" file="$2"
+  awk -v hdr="## [$version]" '
+    index($0, hdr) == 1 { found=1; print; next }
+    found && index($0, "## [") == 1 { exit }
+    found { print }
+  ' "$file"
+}
+
+# =============================================================================
+# Preconditions — checked in both modes, since a dry-run should surface any
+# problem the real run would hit too.
+# =============================================================================
+
+CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+[[ "$CURRENT_BRANCH" != "main" ]] && die "must be on main (currently on $CURRENT_BRANCH)"
+
+[[ -n "$(git status --porcelain)" ]] && die "working tree is not clean — commit or stash first"
+
+echo ">>> Fetching origin/main"
+git fetch origin main --quiet
+LOCAL_SHA="$(git rev-parse main)"
+REMOTE_SHA="$(git rev-parse origin/main)"
+[[ "$LOCAL_SHA" != "$REMOTE_SHA" ]] && die "main is not up to date with origin/main — pull first"
+
+git rev-parse "$TAG" >/dev/null 2>&1 && die "tag $TAG already exists locally"
+if git ls-remote --exit-code --tags origin "$TAG" >/dev/null 2>&1; then
+  die "tag $TAG already exists on origin"
+fi
+
+echo
+echo "Release plan: $TAG"
+[[ "$DRY_RUN" -eq 1 ]] && echo "(dry-run — pass --execute to actually perform these steps)"
+echo
+
+# =============================================================================
+# Step 1: pre-flight quality gate
+# =============================================================================
+note "just check"
+if [[ "$DRY_RUN" -eq 0 ]]; then
+  just check
+fi
+
+# =============================================================================
+# Step 2: bump [workspace.package] version in Cargo.toml
+# =============================================================================
+CURRENT_VERSION="$(grep -m1 '^version' Cargo.toml | sed -E 's/^version *= *"([^"]+)"/\1/')"
+note "Bump Cargo.toml version: $CURRENT_VERSION -> $VERSION"
+if [[ "$DRY_RUN" -eq 0 ]]; then
+  sed -i.bak -E "s/^version     = \"$CURRENT_VERSION\"/version     = \"$VERSION\"/" Cargo.toml
+  rm -f Cargo.toml.bak
+  cargo check --workspace --quiet
+fi
+
+# =============================================================================
+# Step 3: regenerate CHANGELOG.md
+# =============================================================================
+note "Generate CHANGELOG.md for $TAG via git-cliff"
+TMP_CHANGELOG="$(mktemp)"
+trap 'rm -f "$TMP_CHANGELOG"' EXIT
+git-cliff --tag "$TAG" --unreleased -o "$TMP_CHANGELOG" 2>/dev/null
+NOTES="$(extract_changelog_section "$VERSION" "$TMP_CHANGELOG")"
+echo "--- release notes preview ---"
+echo "$NOTES"
+echo "-----------------------------"
+if [[ "$DRY_RUN" -eq 0 ]]; then
+  cp "$TMP_CHANGELOG" CHANGELOG.md
+fi
+
+# =============================================================================
+# Step 4: commit, tag, push
+# =============================================================================
+note "Commit: chore(release): $TAG"
+run git add Cargo.toml Cargo.lock CHANGELOG.md
+run git commit -m "chore(release): $TAG"
+
+note "Tag: $TAG"
+run git tag -a "$TAG" -m "$TAG"
+
+note "Push main and $TAG to origin"
+run git push origin main
+run git push origin "$TAG"
+
+# =============================================================================
+# Step 5: GitHub Release
+# =============================================================================
+note "Create GitHub Release $TAG with the notes above"
+if [[ "$DRY_RUN" -eq 0 ]]; then
+  NOTES_FILE="$(mktemp)"
+  echo "$NOTES" > "$NOTES_FILE"
+  gh release create "$TAG" --title "$TAG" --notes-file "$NOTES_FILE"
+  rm -f "$NOTES_FILE"
+fi
+
+echo
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  echo "Dry run complete — nothing changed. Re-run with --execute to perform this release."
+else
+  REPO_SLUG="$(git remote get-url origin | sed -E 's#.*github\.com[:/](.+)\.git#\1#')"
+  echo "Released $TAG: https://github.com/$REPO_SLUG/releases/tag/$TAG"
+fi
