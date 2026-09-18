@@ -67,3 +67,10 @@ just run example       # run the example service locally
 ```
 
 See `CLAUDE.md` for the working rules and workspace conventions this template enforces.
+
+## License
+
+Licensed under the Apache License, Version 2.0 (the "License"); see [LICENSE](LICENSE).
+This covers the template's own content (scaffolding, skills, example code). A project
+generated from this template picks its own license when scaffolded — see the `license`
+field in its `Cargo.toml`.
