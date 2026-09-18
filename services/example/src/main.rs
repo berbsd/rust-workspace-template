@@ -45,7 +45,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// sends) so `axum::serve` can drain in-flight requests before exiting.
 async fn shutdown_signal() {
   let ctrl_c = async {
-    let _unused = tokio::signal::ctrl_c().await;
+    // Registration failure here is as rare as the SIGTERM case below and,
+    // like it, not worth taking the process down over — but log it instead
+    // of silently discarding it, since a failure here means Ctrl-C stops
+    // working for graceful shutdown without any signal that it did.
+    let _result: Result<(), std::io::Error> = tokio::signal::ctrl_c()
+      .await
+      .inspect_err(|error| tracing::warn!(%error, "failed to install ctrl-c handler"));
   };
 
   #[cfg(unix)]

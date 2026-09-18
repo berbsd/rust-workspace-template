@@ -246,6 +246,24 @@ async fn list_widgets_rejects_an_undecodable_cursor(pool: PgPool) {
   assert_eq!(body["error"], "VALIDATION_ERROR");
 }
 
+/// A `limit` above `MAX_LIMIT` is rejected as a `400`, never silently
+/// clamped down to the cap — a clamped response would be indistinguishable
+/// from a complete one, leaving the client no way to learn it is missing
+/// rows (see `common_types::MAX_LIMIT`'s own doc comment).
+#[sqlx::test(migrations = "./migrations")]
+async fn list_widgets_rejects_an_out_of_range_limit(pool: PgPool) {
+  let router = router(pool);
+
+  let resp = router
+    .oneshot(request("GET", &format!("{WIDGETS_PATH}?limit=500"), None))
+    .await
+    .expect("request succeeds");
+
+  assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+  let body = common::read_json(resp).await;
+  assert_eq!(body["error"], "VALIDATION_ERROR");
+}
+
 /// `DELETE /widgets/{id}` removes the widget; a second delete then `404`s.
 #[sqlx::test(migrations = "./migrations")]
 async fn delete_widget_removes_it(pool: PgPool) {

@@ -12,14 +12,19 @@
 use axum::body::Body;
 use serde_json::Value;
 
+/// Generous ceiling for a test response body — every response in this suite
+/// is a handful of JSON fields, so this only exists to turn a runaway
+/// response into a clear panic instead of an unbounded read.
+const MAX_TEST_BODY_BYTES: usize = 256 * 1024;
+
 /// Reads a response body and parses it as JSON.
 ///
 /// # Panics
 ///
-/// Panics if the body cannot be read within the 256 KiB limit — a
+/// Panics if the body cannot be read within [`MAX_TEST_BODY_BYTES`] — a
 /// test-setup bug, not a condition a test should handle.
 pub async fn read_json(resp: axum::http::Response<Body>) -> Value {
-  let bytes = axum::body::to_bytes(resp.into_body(), 256 * 1024)
+  let bytes = axum::body::to_bytes(resp.into_body(), MAX_TEST_BODY_BYTES)
     .await
     .expect("read body");
   serde_json::from_slice(&bytes).unwrap_or(Value::Null)

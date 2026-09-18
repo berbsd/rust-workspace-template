@@ -60,24 +60,32 @@ pub(crate) async fn get_widget(
 }
 
 /// `GET /widgets` query parameters.
-#[derive(Debug, Deserialize)]
-pub(crate) struct ListParams {
-  /// Page size; defaults to [`DEFAULT_LIMIT`], capped at [`MAX_LIMIT`].
+#[derive(Debug, Deserialize, Validate)]
+pub(crate) struct WidgetListParams {
+  /// Page size; defaults to [`DEFAULT_LIMIT`] when absent. An out-of-range
+  /// value is a `400`, never silently clamped — see [`MAX_LIMIT`]'s own doc
+  /// comment for why a clamped response is worse than an error.
+  #[garde(range(min = 1, max = MAX_LIMIT))]
   limit:  Option<i64>,
-  /// Opaque cursor from a previous page's `next_cursor`.
+  /// Opaque cursor from a previous page's `next_cursor`. Its format is
+  /// checked on decode ([`WidgetError::decode_cursor`]), not here.
+  #[garde(skip)]
   cursor: Option<String>,
 }
 
 /// `GET /widgets` — lists widgets newest-first, paginated by cursor.
 ///
 /// # Errors
-/// [`WidgetError::Validation`] if `cursor` does not decode;
-/// [`WidgetError::Database`] if the query fails.
+/// [`WidgetError::Validation`] if `limit` is out of range or `cursor` does
+/// not decode; [`WidgetError::Database`] if the query fails.
 pub(crate) async fn list_widgets(
   State(repo): State<SharedRepo>,
-  Query(params): Query<ListParams>,
+  Query(params): Query<WidgetListParams>,
 ) -> Result<Json<PaginatedResponse<WidgetResponse>>, WidgetError> {
-  let limit = params.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+  params
+    .validate()
+    .map_err(|report| WidgetError::Validation(validation_details(&report)))?;
+  let limit = params.limit.unwrap_or(DEFAULT_LIMIT);
   let after = WidgetError::decode_cursor::<WidgetCursor>(params.cursor.as_deref())?
     .map(|cursor| (cursor.created_at, cursor.id));
 

@@ -24,9 +24,10 @@
 //! Every service defines its own domain error enum and maps it onto the
 //! envelope via [`ApiErrorMapping`] + [`impl_api_error_response!`]:
 //!
-//! ```ignore
+//! ```no_run
 //! use axum::http::StatusCode;
 //! use common_types::{ApiErrorMapping, impl_api_error_response};
+//! use thiserror::Error;
 //!
 //! #[derive(Debug, Error)]
 //! pub enum PaymentError {
@@ -264,7 +265,7 @@ pub fn validation_details(report: &garde::Report) -> serde_json::Value {
 /// The natural spelling is a blanket impl, and Rust's orphan rules (RFC 1023)
 /// forbid it:
 ///
-/// ```ignore
+/// ```compile_fail
 /// // Does not compile: `IntoResponse` is axum's, `T` could be anyone's.
 /// impl<T: ApiErrorMapping + Display> axum::response::IntoResponse for T { ... }
 /// ```

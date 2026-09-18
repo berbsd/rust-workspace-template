@@ -14,8 +14,10 @@ pub(crate) enum WidgetError {
   /// structured per-field details for [`ApiErrorMapping::details`].
   #[error("validation failed")]
   Validation(serde_json::Value),
-  /// The database rejected or failed to serve the query.
-  #[error("database error: {0}")]
+  /// The database rejected or failed to serve the query. The Display text
+  /// is what reaches the client via `ApiErrorBody::message` — never the raw
+  /// `sqlx::Error`, which includes table/column names and query fragments.
+  #[error("an internal error occurred")]
   Database(#[from] sqlx::Error),
 }
 
