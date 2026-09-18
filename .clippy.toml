@@ -1,0 +1,55 @@
+# Clippy configuration shared across the workspace.
+#
+# Lint *levels* (warn/deny/allow) live in `Cargo.toml` under
+# `[workspace.lints.clippy]`. This file only configures lint *thresholds* and
+# behaviour for lints whose level is set elsewhere.
+
+# Function size cap. Aim under ~50 lines of effective body; raw-source-line
+# equivalent is around 80 once blank lines and braces are counted. Default is
+# 100. Tighter than default forces decomposition while leaving headroom for
+# orchestrator functions.
+too-many-lines-threshold = 80
+
+# Function argument cap. Default is 7. Holding the line at 7 surfaces helper
+# structs ("parameter objects") instead of long signatures.
+too-many-arguments-threshold = 7
+
+# Cognitive complexity cap. Default is 25. Holding the line at 25 keeps the
+# threshold loose enough to allow legitimate state machines while flagging
+# nested branching that wants to be split.
+cognitive-complexity-threshold = 25
+
+# Calls that are always the wrong choice here, with the right one named in the
+# error. This is where a "never call X" rule belongs once it exists — prose in
+# CLAUDE.md is enforced by whoever happens to read it, this is enforced by the
+# compiler, and the `reason`/`replacement` fields put the argument in front of
+# whoever hits it rather than in a document they have to go find.
+#
+# The level lives in `Cargo.toml` as `disallowed_methods`, at a priority high
+# enough to beat the `style` group; see the note there.
+#
+# Every entry below should have zero call sites when adopted, and only
+# prevents regressions. A rule the codebase already violates does not belong
+# here until the violations are gone.
+disallowed-methods = [
+  # Blocking the thread blocks every other task sharing that executor thread,
+  # and in a service where nearly everything is behind an async handler that
+  # is a stall the caller sees as latency.
+  { path = "std::thread::sleep", reason = "blocks the async executor thread", replacement = "tokio::time::sleep" },
+
+  # Panics outright when called from inside a runtime, which is the only
+  # place this codebase would call it from.
+  { path = "tokio::sync::Mutex::blocking_lock", reason = "panics when called from within an async runtime", replacement = "Mutex::lock().await" },
+
+  # Same reasoning as the sleep above: these wait on a child process for an
+  # unbounded time on whichever thread called them.
+  { path = "std::process::Command::spawn", reason = "blocks the calling thread for an unknown duration", replacement = "tokio::process::Command::spawn" },
+  { path = "std::process::Command::output", reason = "blocks the calling thread for an unknown duration", replacement = "tokio::process::Command::output" },
+  { path = "std::process::Command::status", reason = "blocks the calling thread for an unknown duration", replacement = "tokio::process::Command::status" },
+
+  # Timestamps should be UTC everywhere in a distributed system. `Local` reads
+  # the host timezone, so it produces one value on a developer's machine and
+  # another in a container — the kind of bug that only shows up in
+  # production.
+  { path = "chrono::Local::now", reason = "resolves against the host timezone; timestamps here are UTC end to end", replacement = "chrono::Utc::now" },
+]

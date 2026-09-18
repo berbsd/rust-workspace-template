@@ -1,0 +1,32 @@
+# Commits to skip when running `git blame`.
+#
+# Only tree-wide formatter runs belong here: commits where every changed file
+# is byte-identical to its parent once whitespace, trailing commas and key
+# order are normalised away. A commit that also changes behaviour must not be
+# listed, because this file is per-commit and cannot ignore a commit for one
+# file while honouring it for another — listing a mixed commit hides its real
+# change from blame entirely.
+#
+# `.rustfmt.toml` and `.taplo.toml` both align on content width
+# (struct_field_align_threshold, align_entries), and `.taplo.toml` reorders
+# keys. That means a one-line edit to a long entry reformats every sibling
+# around it, so these commits will keep appearing.
+#
+# GitHub reads this file automatically in its blame view:
+#   https://docs.github.com/en/repositories/working-with-files/using-files/viewing-a-file#ignore-commits-in-the-blame-view
+#
+# To use it locally:
+#   git config --local blame.ignoreRevsFile .git-blame-ignore-revs
+# To stop using it:
+#   git config --local --unset blame.ignoreRevsFile
+#
+# Before adding an entry, confirm the commit is formatting-only:
+#   git show -w --format='' <sha> | grep -E '^[+-][^+-]'
+# and check it reorder-insensitively, since taplo sorts keys:
+#   for f in $(git show --name-only --format='' <sha>); do
+#     diff <(git show <sha>^:$f | tr -d '[:blank:]' | tr -d ',' | sort) \
+#          <(git show <sha>:$f  | tr -d '[:blank:]' | tr -d ',' | sort)
+#   done
+#
+# No entries yet — this template has no commit history of its own. Add
+# formatting-only commit SHAs here as they land.

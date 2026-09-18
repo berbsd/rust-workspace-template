@@ -1,0 +1,89 @@
+# Secret-scanning configuration.
+#
+# Read by both `betterleaks` and `gitleaks` — betterleaks looks for
+# .betterleaks.toml first and falls back to this filename, so a single file
+# configures both tools.
+#
+# Scan with:  betterleaks git .        (tracked content + history, ~0.3s)
+# NOT with:   betterleaks dir .        (ignores .gitignore, walks target/, ~98s)
+#
+# `useDefault` is mandatory. Without it a config REPLACES the built-in ruleset
+# instead of extending it, leaving zero rules loaded — every scan then reports
+# "no leaks found" regardless of content, and exits 0. Verify with:
+#   betterleaks config check -c .gitleaks.toml      # expect "OK: 417 rules"
+#
+# NEVER give an allowlist a `paths` key. betterleaks compiles allowlist paths
+# into its `prefilter` — the same skip expression that drops node_modules and
+# binaries — so the matching files are removed from the corpus before any rule
+# runs, and the allowlist's own `regexes` are never consulted. The result is a
+# directory scanned with zero rules, reporting "no leaks found" and exiting 0.
+# `matchCondition = "AND"` does not change this. Scope by making the regex
+# specific instead. Verify any change by planting a canary:
+#   printf 'k="sk_live_51QwErTyUiOpAsDfGhJkLzXcV"' > <path>/canary.txt
+#   betterleaks dir <path> -c .gitleaks.toml        # must report 1 leak
+
+[extend]
+useDefault = true
+
+# Placeholder UUID used as a fixture subject id across tests.
+[[allowlists]]
+description = "Fixture rauthy_sub UUID (crates/common-types/src/normalize.rs)"
+regexTarget = "match"
+regexes     = ['''a1b2c3d4-e5f6-7890-abcd-ef1234567890''']
+
+# Connection strings pointing at a loopback or deliberately-unresolvable host
+# cannot leak anything: the credential is only meaningful to a database that
+# exists on the developer's own machine. Matching on the HOST rather than on
+# the file path is deliberate — a credential for a real host stays a finding
+# even when it appears in a test file.
+[[allowlists]]
+description = "Local/dev database URIs (localhost, loopback, unresolvable hosts)"
+regexTarget = "match"
+regexes = [
+  '''://[^@\s]+@(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal|nonexistent)(?:[:/]|$)''',
+]
+
+# Postgres service-container password in CI. The container is created with this
+# value, lives for the length of one job, and is reachable only from that job.
+# Anchored to the whole secret, so only the literal value is ignored — and it
+# is not a credential for anything reachable. Not path-scoped: see the `paths`
+# warning in the header.
+[[allowlists]]
+description = "CI Postgres service container credentials"
+regexTarget = "secret"
+regexes     = ['''^postgres$''']
+
+# Seed passwords for the demo dataset. Not credentials for any real account.
+# `SquadriDemo!2026` is the pre-rebrand value and `test-password` a unit-test
+# fixture; both survive only in history (commits d0c5f4d and bec28e9), so they
+# still have to be listed for a history scan to come back clean. Exact literals
+# rather than a path scope: see the `paths` warning in the header.
+[[allowlists]]
+description = "Demo seed passwords, current and historical"
+regexTarget = "match"
+regexes = [
+  '''ExampleDemo!2026''',
+  '''SquadriDemo!2026''',
+  '''test-password''',
+  # Throwaway override value in a deleted unit test (bec28e9). Matched with
+  # its surrounding context so the bare word stays a finding elsewhere.
+  "PASSWORD: 'other'",
+]
+
+# The canary fixture documented in the tool-readiness skill
+# (.claude/skills/tool-readiness/prompts/03-gate-falsifiability.md), which
+# prescribes planting this exact string to prove the scanner still fires. The
+# repo that tells you to plant it necessarily contains it.
+#
+# Anchored to the WHOLE secret, so only this literal is ignored: any other
+# Stripe key, here or anywhere else, is still a finding. Scoped by content
+# rather than by excluding the skill directory — a path exclusion would blind
+# the scan to a genuine credential pasted into a prompt later.
+#
+# Verify it still bites after any edit here:
+#   printf 'k="sk_live_99ZzXxCcVvBbNnMmAaSsDd"' > /tmp/canary/c.txt
+#   betterleaks dir /tmp/canary -c .gitleaks.toml    # must report 1 leak
+[[allowlists]]
+description = "Canary fixture used to prove the scanner still fires"
+regexTarget = "secret"
+regexes     = ['''^sk_live_51QwErTyUiOpAsDfGhJkLzXcV$''']

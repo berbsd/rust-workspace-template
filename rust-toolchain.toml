@@ -1,0 +1,16 @@
+# =============================================================================
+# Rust Toolchain Configuration
+# =============================================================================
+# Specifies which Rust version to use for this workspace.
+# Rustup will automatically install and use this version.
+#
+# Documentation: https://rust-lang.github.io/rustup/overrides.html
+#
+# Note: .rustfmt.toml requires nightly features, so use `cargo +nightly fmt`
+# for formatting even when using stable for builds.
+# =============================================================================
+
+[toolchain]
+channel    = "1.98.1"
+profile    = "minimal"
+components = ["rustfmt", "clippy", "rust-src"]

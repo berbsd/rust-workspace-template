@@ -1,0 +1,89 @@
+# =============================================================================
+# Lefthook Configuration
+# =============================================================================
+# Git hooks manager - runs tools before commit and on commit messages.
+# Documentation: https://github.com/evilmartians/lefthook
+#
+# Hooks configured:
+#   pre-commit:  Runs betterleaks, typos, rustfmt, and squawk on staged files
+#   commit-msg:  Runs cogitto (cog) to enforce conventional commits
+#
+# Usage:
+#   lefthook install    # Install hooks (run once after clone)
+#   lefthook run pre-commit   # Manually trigger pre-commit hooks
+#   lefthook run commit-msg   # Manually trigger commit-msg hooks
+# =============================================================================
+
+output:
+  - summary
+  - failure
+
+pre-commit:
+  # piped, not parallel. parallel would be unsafe here: `rustfmt` rewrites the
+  # staged files and `stage_fixed: true` git-adds them, so concurrent commands
+  # would race on the file contents and on .git/index.lock.
+  #
+  # piped also stops at the first failure, which parallel and plain sequential
+  # do not. Measured 2026-09-09 with a typo staged in a .rs file: 3.12s, because
+  # `audits` (2.82s) sorts FIRST alphabetically and `typos` (0.03s) sorts last.
+  # The same defect now costs ~0.05s.
+  #
+  # priority is mandatory with piped: lefthook orders alphabetically otherwise,
+  # which is how the 0.03s check ended up behind the 2.82s one. Ordered by
+  # measured cost ascending:
+  #   typos 0.03 · betterleaks 0.09 · rustfmt 0.12 · squawk · audits 2.82
+  # `audits` stays after `rustfmt` so it inspects formatted code.
+  piped: true
+  commands:
+    betterleaks:
+      priority: 2
+      run: betterleaks git . --staged --no-banner --redact
+    typos:
+      priority: 1
+      glob: "*"
+      # Passing paths explicitly makes typos ignore `extend-exclude` in
+      # `.typos.toml`, so binary fixtures have to be excluded here too — it
+      # reads their compressed bytes as text and reports thousands of false
+      # positives.
+      exclude:
+        # Skill/prompt files quote serde's module paths verbatim, and typos
+        # reads those short module names as misspelt English words. Already
+        # excluded in `.typos.toml`; mirrored here because that file's
+        # `extend-exclude` is ignored when paths are passed explicitly.
+        - ".claude/**"
+      run: typos {staged_files}
+    rustfmt:
+      priority: 3
+      glob: "*.rs"
+      # `rustfmt` on the staged files, not `cargo fmt` on the workspace.
+      # `cargo fmt` takes no file scope: it reformats every dirty `.rs` file in
+      # the tree, and `stage_fixed` then adds them all — so a commit touching
+      # one file could absorb another session's uncommitted Rust work, with a
+      # message describing none of it. That happened in 7ac7d0c0.
+      #
+      # Edition is passed explicitly because rustfmt invoked directly gets no
+      # Cargo manifest to read it from and would otherwise assume 2015.
+      # `.rustfmt.toml` is still found by walking up from each file, and the
+      # nightly toolchain is still required by the unstable options in it.
+      run: rustfmt +nightly --edition 2024 {staged_files}
+      stage_fixed: true
+    squawk:
+      priority: 4
+      glob: "*.sql"
+      run: npx squawk {staged_files}
+
+commit-msg:
+  # piped, not parallel: cheaper structural check (cog verify) first, so a
+  # malformed type/scope reports before spending time on the line-length
+  # scan.
+  piped: true
+  commands:
+    conventional-commit:
+      priority: 1
+      run: cog verify "$(cat {1})"
+    line-length:
+      # cog.toml has no config surface for subject/body line length — see
+      # bin/check-commit-message's own header comment — so this is a
+      # separate check, not a cog.toml option.
+      priority: 2
+      run: bin/check-commit-message {1}
