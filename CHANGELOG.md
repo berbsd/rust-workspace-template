@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2] - 2026-09-18
+
+### Bug Fixes
+
+- Bin/release's --unreleased flag was overwriting CHANGELOG.md
+
 ## [0.1.1] - 2026-09-18
 
 ### Bug Fixes
