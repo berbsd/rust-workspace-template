@@ -5,7 +5,7 @@
 # files across builds — typically cuts rebuild time from ~15 min to ~2 min.
 #
 # Usage (from the repo root — the build context must stay there):
-#   docker buildx build --build-arg SERVICE=auth -f docker/Dockerfile .
+#   docker buildx build --build-arg SERVICE=example -f docker/Dockerfile .
 # =============================================================================
 
 # --- Stage 1: Build ----------------------------------------------------------

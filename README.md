@@ -18,7 +18,7 @@ filled in when a new project is generated from it.
 - **`services/example/`** — a real, self-contained CRUD service (`feature/widget`) built
   directly on `axum`/`sqlx`/`tokio` — no shared bootstrap or middleware framework to depend
   on. `main.rs` → `lib.rs`'s `router(pool)` → `feature/widget/{model,handler,repository,error}.rs`
-  is the whole shape; copy it for your first real feature. 9 integration tests exercise it
+  is the whole shape; copy it for your first real feature. 10 integration tests exercise it
   end-to-end against a real Postgres.
 - **`hosts/example-host/`** — a binary that nests `example::router(pool)` under a path
   prefix, demonstrating how multiple services would compose into one deployable process to
