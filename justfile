@@ -50,14 +50,16 @@ check:
     @echo "=== Format Check ==="
     @cargo +nightly fmt --check
     @echo "=== Clippy ==="
-    @cargo clippy --all-targets --all-features
+    @cargo clippy -q --all-targets --all-features
     @echo "=== Tests ==="
     @just db-ensure
-    @DATABASE_URL="${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/postgres}" cargo test --all-features
+    @DATABASE_URL="${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/postgres}" cargo nextest run --cargo-quiet --all-features
+    @echo "=== Doc Tests ==="
+    @DATABASE_URL="${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/postgres}" cargo test --doc -q --all-features
     @echo "=== Typos ==="
     @typos
     @echo "=== Security Check ==="
-    @cargo deny check
+    @cargo deny check --hide-inclusion-graph
     @echo "=== All Checks Passed ==="
 
 # Format all code (Rust + TOML)
