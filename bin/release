@@ -134,7 +134,12 @@ fi
 note "Generate CHANGELOG.md for $TAG via git-cliff"
 TMP_CHANGELOG="$(mktemp)"
 trap 'rm -f "$TMP_CHANGELOG"' EXIT
-git-cliff --tag "$TAG" --unreleased -o "$TMP_CHANGELOG" 2>/dev/null
+# No --unreleased here: that flag scopes git-cliff to *only* commits since
+# the last tag, excluding every previously-tagged section entirely -- it
+# overwrote CHANGELOG.md down to just the new release instead of the full
+# history. --tag alone still labels the new section correctly while
+# regenerating the complete changelog (every tag, from full git history).
+git-cliff --tag "$TAG" -o "$TMP_CHANGELOG" 2>/dev/null
 NOTES="$(extract_changelog_section "$VERSION" "$TMP_CHANGELOG")"
 echo "--- release notes preview ---"
 echo "$NOTES"
