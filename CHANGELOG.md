@@ -2,14 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.0] - 2026-09-18
+## [0.1.1] - 2026-09-18
 
-### Documentation
+### Bug Fixes
 
-- Add Apache-2.0 LICENSE and README license section
+- Bin/release wrongly required main to exactly match origin
 
 ### Features
 
-- Initial Rust microservices workspace template
+- Add bin/release for tagging releases with changelog notes
+- Add Docker checks, colored output to doctor/bootstrap
+
+### Performance
+
+- Quiet just check's output on success, keep failures verbose
 
 
