@@ -93,9 +93,11 @@ CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 
 echo ">>> Fetching origin/main"
 git fetch origin main --quiet
-LOCAL_SHA="$(git rev-parse main)"
-REMOTE_SHA="$(git rev-parse origin/main)"
-[[ "$LOCAL_SHA" != "$REMOTE_SHA" ]] && die "main is not up to date with origin/main — pull first"
+# Local must not be behind or diverged from origin/main — being *ahead* (e.g.
+# commits made locally, not yet pushed) is fine and expected; the push step
+# below carries them along with the release commit.
+git merge-base --is-ancestor origin/main main \
+  || die "main is behind or has diverged from origin/main — pull first"
 
 git rev-parse "$TAG" >/dev/null 2>&1 && die "tag $TAG already exists locally"
 if git ls-remote --exit-code --tags origin "$TAG" >/dev/null 2>&1; then
