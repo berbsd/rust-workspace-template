@@ -7,9 +7,9 @@
 # the Rust toolchain.
 #
 # Usage:
-#   ./bin/bootstrap.sh
+#   ./bin/bootstrap
 #   # Or if using direnv (recommended):
-#   bootstrap.sh
+#   bootstrap
 #
 # Supported Platforms:
 #   - macOS (via Homebrew)
@@ -22,6 +22,8 @@
 #   - Rust via rustup
 #   - direnv (automatic environment setup)
 #   - taplo (TOML formatter/linter)
+#   - Docker Desktop (throwaway Postgres for tests — must be launched
+#     manually after install; a cask install doesn't start the daemon)
 #
 #   Rust Toolchain:
 #   - Nightly toolchain (for rustfmt unstable features)
@@ -49,6 +51,21 @@
 set -e  # Exit on any error
 
 # =============================================================================
+# Colors — auto-disabled when stdout isn't a terminal or NO_COLOR is set, so
+# piped/redirected output stays free of escape codes.
+# =============================================================================
+
+if [[ -t 1 ]] && [[ -z "${NO_COLOR:-}" ]]; then
+  C_GREEN=$'\033[32m'
+  C_RED=$'\033[31m'
+  C_YELLOW=$'\033[33m'
+  C_BOLD=$'\033[1m'
+  C_RESET=$'\033[0m'
+else
+  C_GREEN='' C_RED='' C_YELLOW='' C_BOLD='' C_RESET=''
+fi
+
+# =============================================================================
 # Helper Functions
 # =============================================================================
 
@@ -56,29 +73,29 @@ set -e  # Exit on any error
 section() {
   echo ""
   echo "=============================================="
-  echo "$1"
+  echo "${C_BOLD}$1${C_RESET}"
   echo "=============================================="
 }
 
-# Print step
+# Print a transient in-progress line (not a final status)
 step() {
   echo ">>> $1"
 }
 
-# Print success message
-success() {
-  echo "$1"
+# Print a final [ok] status line for a tool/item
+ok() {
+  echo "  ${C_GREEN}[ok]${C_RESET}   $1"
 }
 
 # Print error message and exit
 error() {
-  echo "ERROR: $1" >&2
+  echo "${C_RED}ERROR: $1${C_RESET}" >&2
   exit 1
 }
 
 # Print warning message
 warn() {
-  echo "WARNING: $1" >&2
+  echo "${C_YELLOW}WARNING: $1${C_RESET}" >&2
 }
 
 # Check if a command exists
@@ -106,7 +123,7 @@ detect_platform() {
       ;;
   esac
 
-  step "Detected platform: $PLATFORM"
+  ok "platform ($PLATFORM)"
 }
 
 # =============================================================================
@@ -118,7 +135,7 @@ setup_macos() {
 
   # --- Check/Install Homebrew ---
   if ! command_exists brew; then
-    step "Homebrew not found. Installing..."
+    step "installing brew"
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
     # Add Homebrew to PATH for this session
@@ -127,88 +144,82 @@ setup_macos() {
     elif [[ -f /usr/local/bin/brew ]]; then
       eval "$(/usr/local/bin/brew shellenv)"
     fi
-
-    success "Homebrew installed"
-  else
-    success "Homebrew already installed"
   fi
+  ok "brew"
 
   # --- Check/Install Rust via rustup ---
   if ! command_exists rustup; then
-    step "Rust not found. Installing via rustup..."
+    step "installing rustup"
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
     # Source cargo environment for this session
     source "$HOME/.cargo/env"
-
-    success "Rust installed"
-  else
-    success "Rust already installed"
   fi
+  ok "rustup"
 
   # --- Install direnv (optional but recommended) ---
   if ! command_exists direnv; then
-    step "Installing direnv..."
+    step "installing direnv"
     brew install direnv
-    success "direnv installed"
-    warn "Add 'eval \"\$(direnv hook bash)\"' or 'eval \"\$(direnv hook zsh)\"' to your shell config"
-  else
-    success "direnv already installed"
+    warn "add 'eval \"\$(direnv hook bash)\"' or 'eval \"\$(direnv hook zsh)\"' to your shell config"
   fi
+  ok "direnv"
 
   # --- Install taplo (TOML formatter) ---
   if ! command_exists taplo; then
-    step "Installing taplo..."
+    step "installing taplo"
     brew install taplo
-    success "taplo installed"
-  else
-    success "taplo already installed"
   fi
+  ok "taplo"
 
   # --- Install typos (Source code spell checker) ---
   if ! command_exists typos; then
-    step "Installing typos..."
+    step "installing typos"
     brew install typos-cli
-    success "typos installed"
-  else
-    success "typos already installed"
   fi
+  ok "typos"
 
   # --- Install git-cliff (Changelog generator) ---
   if ! command_exists git-cliff; then
-    step "Installing git-cliff..."
+    step "installing git-cliff"
     brew install git-cliff
-    success "git-cliff installed"
-  else
-    success "git-cliff already installed"
   fi
+  ok "git-cliff"
 
   # --- Install lefthook (Git hooks manager) ---
   if ! command_exists lefthook; then
-    step "Installing lefthook..."
+    step "installing lefthook"
     brew install lefthook
-    success "lefthook installed"
-  else
-    success "lefthook already installed"
   fi
+  ok "lefthook"
 
   # --- Install betterleaks (Secret scanning) ---
   if ! command_exists betterleaks; then
-    step "Installing betterleaks..."
+    step "installing betterleaks"
     brew install betterleaks
-    success "betterleaks installed"
-  else
-    success "betterleaks already installed"
   fi
+  ok "betterleaks"
 
   # --- Install cogitto (Conventional commits) ---
   if ! command_exists cog; then
-    step "Installing cogitto..."
+    step "installing cog"
     brew install cocogitto
-    success "cogitto installed"
-  else
-    success "cogitto already installed"
   fi
+  ok "cog"
+
+  # --- Install Docker Desktop (throwaway Postgres for tests) ---
+  # `just test`'s db-ensure recipe needs a running Docker daemon to
+  # provision a throwaway Postgres per test run — a cask install, unlike the
+  # CLI tools above, gets you the app but not a running daemon; Docker
+  # Desktop has to be launched manually (or on login) before `just check`.
+  if ! command_exists docker; then
+    step "installing docker"
+    brew install --cask docker
+    warn "Docker Desktop must be launched before running tests — open it from Applications (or run: open -a Docker) and wait for it to finish starting"
+  elif ! docker info >/dev/null 2>&1; then
+    warn "docker is installed but the daemon isn't running — start Docker Desktop before running tests"
+  fi
+  ok "docker"
 }
 
 # =============================================================================
@@ -261,16 +272,13 @@ setup_rust_toolchain() {
     error "cargo not found. Please ensure Rust is properly installed."
   fi
 
-  step "Updating Rust toolchain..."
+  step "updating rust toolchain"
   rustup update
 
-  step "Installing nightly toolchain (for rustfmt)..."
   rustup toolchain install nightly
-
-  step "Adding components..."
   rustup component add rustfmt clippy
 
-  success "Rust toolchain configured"
+  ok "rust toolchain"
 }
 
 # =============================================================================
@@ -280,28 +288,27 @@ setup_rust_toolchain() {
 install_cargo_tools() {
   section "Installing Cargo tools"
 
-  # --- Testing Tools ---
-  step "Installing testing tools..."
-  cargo install cargo-nextest --locked    # Fast test runner
-  cargo install cargo-llvm-cov --locked   # Code coverage
+  # See this script's header comment for what each tool is for.
+  local tools=(
+    cargo-nextest
+    cargo-llvm-cov
+    cargo-deny
+    cargo-audit
+    cargo-edit
+    just
+    cargo-watch
+    cargo-outdated
+    cargo-machete
+    cargo-udeps
+    cargo-release
+    cargo-semver-checks
+  )
 
-  # --- Security Tools ---
-  step "Installing security tools..."
-  cargo install cargo-deny --locked       # License/security checking
-  cargo install cargo-audit --locked      # Security vulnerabilities
-
-  # --- Development Tools ---
-  step "Installing development tools..."
-  cargo install cargo-edit --locked       # Add, rm, upgrade dependencies
-  cargo install just --locked             # Task runner
-  cargo install cargo-watch --locked      # File watcher
-  cargo install cargo-outdated --locked   # Dependency updates
-  cargo install cargo-machete --locked    # Unused dependencies (fast)
-  cargo install cargo-udeps --locked      # Unused dependencies (thorough, nightly)
-  cargo install cargo-release --locked    # Release automation
-  cargo install cargo-semver-checks --locked  # Semver violation linting
-
-  success "All Cargo tools installed"
+  local tool
+  for tool in "${tools[@]}"; do
+    cargo install "$tool" --locked
+    ok "$tool"
+  done
 }
 
 # =============================================================================
@@ -315,18 +322,17 @@ install_git_hooks() {
   section "Installing Git hooks"
 
   if ! command_exists lefthook; then
-    warn "lefthook is not installed - skipping git hooks. Run 'just hooks' after installing it."
+    warn "lefthook not installed — skipping. Run 'just hooks' after installing it."
     return 0
   fi
 
   if ! git rev-parse --git-dir > /dev/null 2>&1; then
-    warn "Not inside a git repository - skipping git hooks."
+    warn "not inside a git repository — skipping"
     return 0
   fi
 
-  step "Installing lefthook hooks..."
   lefthook install
-  success "Git hooks installed (pre-commit, commit-msg)"
+  ok "git hooks (pre-commit, commit-msg)"
 }
 
 # =============================================================================

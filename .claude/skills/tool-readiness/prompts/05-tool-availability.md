@@ -94,7 +94,7 @@ done
 ## Fixing
 
 1. Ensure the repo has a mechanism that runs `lefthook install`, wired into the
-   onboarding step it already has — `bin/preflight`, `bin/bootstrap.sh`, or
+   onboarding step it already has — `bin/preflight`, `bin/bootstrap`, or
    `package.json`'s `prepare` for a pnpm/npm repo. Do not introduce a new script
    nobody will run. This is the fix that matters; the rest is ergonomics.
 2. Add every hook binary to the setup script.

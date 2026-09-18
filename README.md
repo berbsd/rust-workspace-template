@@ -38,8 +38,8 @@ filled in when a new project is generated from it.
 - **Tooling**: `justfile` (`just check`/`fmt`/`test`/`db-ensure`/…), `lefthook.yml`
   (pre-commit secret scan, formatting, conventional commits — subject/body capped at 72
   chars via `bin/check-commit-message`, since `cog.toml` has no config surface for that),
-  `bin/bootstrap.sh` (installs the whole toolchain), `bin/doctor` (checks it's all still
-  installed, current, and wired up — run it any time, especially after `bootstrap.sh`),
+  `bin/bootstrap` (installs the whole toolchain), `bin/doctor` (checks it's all still
+  installed, current, and wired up — run it any time, especially after `bootstrap`),
   `docker/Dockerfile` (parameterized by `--build-arg SERVICE=`), `.github/workflows/ci.yml`.
 
 ## Not included
@@ -60,7 +60,7 @@ filled in when a new project is generated from it.
 ## Getting started
 
 ```sh
-./bin/bootstrap.sh   # installs rustup toolchain, just, lefthook, taplo, typos, etc.
+./bin/bootstrap       # installs rustup toolchain, just, lefthook, taplo, typos, etc.
 ./bin/doctor          # confirms everything installed cleanly and is up to date
 just check            # format check, clippy, tests, typos, cargo-deny
 just run example       # run the example service locally

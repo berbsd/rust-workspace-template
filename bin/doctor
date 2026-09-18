@@ -3,10 +3,10 @@
 # Doctor Script
 # =============================================================================
 # Checks the health of this workspace's development environment — everything
-# `bin/bootstrap.sh` installs, plus a few things bootstrap doesn't cover
+# `bin/bootstrap` installs, plus a few things bootstrap doesn't cover
 # (dependency freshness, git hooks actually installed, the Claude Code
 # integrations this workspace ships). Read-only: never installs or changes
-# anything, only reports. Run `bin/bootstrap.sh` to fix what this finds
+# anything, only reports. Run `bin/bootstrap` to fix what this finds
 # missing.
 #
 # Usage:
@@ -27,28 +27,44 @@ WARN_COUNT=0
 FAIL_COUNT=0
 
 # =============================================================================
+# Colors — auto-disabled when stdout isn't a terminal or NO_COLOR is set, so
+# piped/redirected output (CI logs, `doctor > file`) stays free of escape
+# codes.
+# =============================================================================
+
+if [[ -t 1 ]] && [[ -z "${NO_COLOR:-}" ]]; then
+  C_GREEN=$'\033[32m'
+  C_RED=$'\033[31m'
+  C_YELLOW=$'\033[33m'
+  C_BOLD=$'\033[1m'
+  C_RESET=$'\033[0m'
+else
+  C_GREEN='' C_RED='' C_YELLOW='' C_BOLD='' C_RESET=''
+fi
+
+# =============================================================================
 # Helper Functions
 # =============================================================================
 
 section() {
   echo ""
   echo "=============================================="
-  echo "$1"
+  echo "${C_BOLD}$1${C_RESET}"
   echo "=============================================="
 }
 
 ok() {
-  echo "  [ok]   $1"
+  echo "  ${C_GREEN}[ok]${C_RESET}   $1"
   OK_COUNT=$((OK_COUNT + 1))
 }
 
 warn() {
-  echo "  [warn] $1"
+  echo "  ${C_YELLOW}[warn]${C_RESET} $1"
   WARN_COUNT=$((WARN_COUNT + 1))
 }
 
 fail() {
-  echo "  [MISS] $1"
+  echo "  ${C_RED}[MISS]${C_RESET} $1"
   FAIL_COUNT=$((FAIL_COUNT + 1))
 }
 
@@ -75,16 +91,18 @@ report_tool() {
       info "$v"
     fi
   elif [[ "$required" == "required" ]]; then
-    fail "$name — not found. Run bin/bootstrap.sh, or install manually."
+    fail "$name"
+    info "not found — run bin/bootstrap, or install manually"
   else
-    warn "$name — not found (optional). Run bin/bootstrap.sh to install it."
+    warn "$name"
+    info "not found (optional) — run bin/bootstrap to install it"
   fi
 }
 
 # =============================================================================
 # 1. Bootstrap dependencies
 # =============================================================================
-# Mirrors bin/bootstrap.sh exactly — if a tool is added there, add it here
+# Mirrors bin/bootstrap exactly — if a tool is added there, add it here
 # too, or this drifts the way the audit scripts this workspace once had did.
 
 check_bootstrap_deps() {
@@ -104,42 +122,65 @@ check_bootstrap_deps() {
   report_tool betterleaks required
   report_tool cog required
 
+  # `report_tool` only confirms the `docker` binary exists — the daemon being
+  # reachable is a separate, more common failure mode (Docker Desktop
+  # installed but not launched). `just test`'s db-ensure recipe needs a live
+  # daemon to provision the throwaway sqlx-test-pg container, so check both,
+  # mirroring db-ensure's own `docker info` check exactly.
+  if command_exists docker; then
+    ok "docker"
+    if docker info >/dev/null 2>&1; then
+      ok "docker daemon"
+    else
+      fail "docker daemon"
+      info "not reachable — start Docker Desktop (or your Docker engine); just test/db-ensure needs it"
+    fi
+  else
+    fail "docker"
+    info "not found — run bin/bootstrap, or install manually"
+  fi
+
   echo ""
   echo "-- Rust toolchain components --"
   if command_exists rustup; then
     if rustup component list --installed 2>/dev/null | grep -q '^rustfmt'; then
       ok "rustfmt component"
     else
-      fail "rustfmt component — run: rustup component add rustfmt"
+      fail "rustfmt component"
+      info "run: rustup component add rustfmt"
     fi
     if rustup component list --installed 2>/dev/null | grep -q '^clippy'; then
       ok "clippy component"
     else
-      fail "clippy component — run: rustup component add clippy"
+      fail "clippy component"
+      info "run: rustup component add clippy"
     fi
     if rustup toolchain list 2>/dev/null | grep -q '^nightly'; then
-      ok "nightly toolchain (needed for cargo +nightly fmt)"
+      ok "nightly toolchain"
     else
-      fail "nightly toolchain — run: rustup toolchain install nightly"
+      fail "nightly toolchain"
+      info "needed for cargo +nightly fmt — run: rustup toolchain install nightly"
     fi
 
     if [[ -f "$(dirname "$0")/../rust-toolchain.toml" ]]; then
-      local pinned installed
+      local pinned
       pinned=$(grep -E '^channel' "$(dirname "$0")/../rust-toolchain.toml" | sed -E 's/.*"([^"]+)".*/\1/')
       if rustup toolchain list 2>/dev/null | grep -q "^${pinned}"; then
-        ok "pinned toolchain $pinned is installed"
+        ok "pinned toolchain ($pinned)"
       else
-        warn "pinned toolchain $pinned (from rust-toolchain.toml) not installed yet — the next cargo command in this workspace will auto-install it"
+        warn "pinned toolchain ($pinned)"
+        info "not installed yet — the next cargo command in this workspace will auto-install it"
       fi
     fi
   else
-    fail "rustup missing — cannot check toolchain components"
+    fail "rustup"
+    info "cannot check toolchain components without it"
   fi
 
   echo ""
   echo "-- Cargo subcommands --"
   # Each of these installs as a cargo-<name> binary on PATH, invoked via
-  # `cargo <name>`, per bin/bootstrap.sh's install_cargo_tools.
+  # `cargo <name>`, per bin/bootstrap's install_cargo_tools.
   report_tool cargo-nextest required
   report_tool cargo-llvm-cov required
   report_tool cargo-deny required
@@ -167,14 +208,23 @@ check_updates() {
     repo_root="$(cd "$(dirname "$0")/.." && pwd)"
     local out
     out=$(cd "$repo_root" && cargo outdated -R 2>&1)
-    if echo "$out" | grep -qE '^\S+\s+\S+\s+\S+\s+\S+'; then
-      warn "outdated workspace dependencies found — run 'cargo outdated -R' for details"
-      info "$(echo "$out" | head -20)"
+    # cargo-outdated prints the literal sentence "All dependencies are up to
+    # date" when there's nothing to report, and a table (Name/Project/Compat/
+    # Latest/...) otherwise. A prior version of this check pattern-matched
+    # "4+ whitespace-separated tokens" to detect a table row, which also
+    # matched that up-to-date sentence itself (it's 4+ words) and reported a
+    # false "outdated" every time. Checking for the known success string
+    # directly is unambiguous.
+    if echo "$out" | grep -q "All dependencies are up to date"; then
+      ok "workspace dependencies"
     else
-      ok "workspace dependencies are up to date (per cargo outdated -R)"
+      warn "workspace dependencies"
+      info "outdated — run 'cargo outdated -R' for details"
+      info "$(echo "$out" | head -20)"
     fi
   else
-    warn "cargo-outdated not installed — cannot check workspace dependency freshness. Run bin/bootstrap.sh."
+    warn "workspace dependencies"
+    info "cargo-outdated not installed — run bin/bootstrap"
   fi
 
   echo ""
@@ -183,13 +233,14 @@ check_updates() {
     local outdated
     outdated=$(brew outdated --formula 2>/dev/null | grep -E '^(direnv|taplo|typos-cli|git-cliff|lefthook|betterleaks|cocogitto)\b' || true)
     if [[ -n "$outdated" ]]; then
-      warn "outdated Homebrew tools:"
+      warn "Homebrew tools"
       echo "$outdated" | sed 's/^/         /'
     else
-      ok "Homebrew-installed tools are up to date"
+      ok "Homebrew tools"
     fi
   else
-    warn "not on macOS or Homebrew unavailable — skipping CLI tool freshness check (check manually on Linux)"
+    warn "Homebrew tools"
+    info "not on macOS or Homebrew unavailable — check manually"
   fi
 
   echo ""
@@ -198,10 +249,11 @@ check_updates() {
     local update_out
     update_out=$(rustup check 2>&1 || true)
     if echo "$update_out" | grep -qi "update available"; then
-      warn "a newer Rust toolchain is available — run 'rustup update' (and consider bumping rust-toolchain.toml)"
+      warn "Rust toolchain"
+      info "update available — run 'rustup update' (and consider bumping rust-toolchain.toml)"
       info "$(echo "$update_out")"
     else
-      ok "Rust toolchains are current"
+      ok "Rust toolchain"
     fi
   fi
 }
@@ -219,12 +271,14 @@ check_claude_integrations() {
   echo "-- Context7 MCP server (.mcp.json) --"
   if [[ -f "$repo_root/.mcp.json" ]]; then
     if grep -q '"context7"' "$repo_root/.mcp.json"; then
-      ok ".mcp.json registers the context7 MCP server"
+      ok "context7 MCP server"
     else
-      warn ".mcp.json exists but has no \"context7\" entry — documentation lookups won't use it"
+      warn "context7 MCP server"
+      info ".mcp.json exists but has no \"context7\" entry — documentation lookups won't use it"
     fi
   else
-    fail ".mcp.json is missing — no context7 MCP server registered"
+    fail "context7 MCP server"
+    info ".mcp.json is missing"
   fi
 
   echo ""
@@ -233,12 +287,14 @@ check_claude_integrations() {
     local count
     count=$(find "$repo_root/.claude/skills" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')
     if [[ "$count" -gt 0 ]]; then
-      ok "$count project skill(s) present under .claude/skills/"
+      ok "project skills ($count)"
     else
-      warn ".claude/skills/ exists but is empty"
+      warn "project skills"
+      info ".claude/skills/ exists but is empty"
     fi
   else
-    warn "no .claude/skills/ directory found"
+    warn "project skills"
+    info "no .claude/skills/ directory found"
   fi
 }
 
@@ -275,16 +331,17 @@ check_git_hooks() {
   for hook in pre-commit commit-msg; do
     local hook_path="$git_dir/hooks/$hook"
     if [[ -f "$hook_path" ]] && grep -qi lefthook "$hook_path" 2>/dev/null; then
-      ok "$hook hook installed (lefthook)"
+      ok "$hook hook"
     else
-      fail "$hook hook not installed — run 'lefthook install' (bin/bootstrap.sh does this automatically)"
+      fail "$hook hook"
+      info "not installed — run 'lefthook install' (bin/bootstrap does this automatically)"
     fi
   done
 
   if [[ -f "$repo_root/lefthook.yml" ]]; then
-    ok "lefthook.yml present"
+    ok "lefthook.yml"
   else
-    fail "lefthook.yml missing"
+    fail "lefthook.yml"
   fi
 
   echo ""
@@ -308,11 +365,13 @@ check_claude_environment() {
     local plugin_list
     plugin_list=$(claude plugin list 2>/dev/null || true)
     if echo "$plugin_list" | grep -qi superpowers; then
-      ok "superpowers plugin installed"
+      ok "superpowers plugin (claude plugin list)"
     elif [[ -n "$plugin_list" ]]; then
-      warn "superpowers plugin not found in 'claude plugin list' output"
+      warn "superpowers plugin (claude plugin list)"
+      info "not found in 'claude plugin list' output"
     else
-      warn "could not determine plugin list (claude plugin list produced no output) — checking common install paths instead"
+      warn "superpowers plugin (claude plugin list)"
+      info "produced no output — checking common install paths instead"
     fi
   fi
 
@@ -320,9 +379,10 @@ check_claude_environment() {
   # command above may not exist or may format output differently across
   # Claude Code versions, so this is a second, independent signal.
   if find "$HOME/.claude/plugins" -maxdepth 3 -iname "superpowers*" -print -quit 2>/dev/null | grep -q .; then
-    ok "superpowers plugin found under ~/.claude/plugins"
+    ok "superpowers plugin (filesystem)"
   else
-    warn "superpowers plugin not found under ~/.claude/plugins — if you use Claude Code, consider installing it for the brainstorming/systematic-debugging/writing-plans skills it provides"
+    warn "superpowers plugin (filesystem)"
+    info "not found under ~/.claude/plugins — consider installing it for the brainstorming/systematic-debugging/writing-plans skills it provides"
   fi
 }
 
@@ -341,15 +401,15 @@ main() {
   check_claude_environment
 
   section "Summary"
-  echo "  $OK_COUNT ok, $WARN_COUNT warning(s), $FAIL_COUNT missing/failed"
+  echo "  ${C_GREEN}$OK_COUNT ok${C_RESET}, ${C_YELLOW}$WARN_COUNT warning(s)${C_RESET}, ${C_RED}$FAIL_COUNT missing/failed${C_RESET}"
   echo ""
 
   if [[ "$FAIL_COUNT" -gt 0 ]]; then
-    echo "Run ./bin/bootstrap.sh to install missing required tools, then re-run ./bin/doctor."
+    echo "${C_RED}Run ./bin/bootstrap to install missing required tools, then re-run ./bin/doctor.${C_RESET}"
     exit 1
   fi
 
-  echo "Environment looks healthy."
+  echo "${C_GREEN}Environment looks healthy.${C_RESET}"
   exit 0
 }
 
