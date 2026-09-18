@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.3] - 2026-09-18
+
+### Bug Fixes
+
+- Rust-quality review findings in the example service
+
+### Documentation
+
+- Fix stale test count and Dockerfile example service name
+- Add hosts/README.md explaining the Cloud Run cost rationale
+
 ## [0.1.2] - 2026-09-18
 
 ### Bug Fixes
