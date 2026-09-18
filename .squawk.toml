@@ -1,0 +1,38 @@
+# Squawk — Postgres migration linter
+# https://squawkhq.com/docs/
+
+pg_version = "16"
+
+# These migrations run on empty tables (initial setup), so concurrent index
+# creation and timeout settings are unnecessary.
+excluded_rules = [
+  "require-concurrent-index-creation",
+  "require-concurrent-index-deletion",
+  "require-timeout-settings",
+  # INT is fine for bounded counters like photo_count, width_px, height_px
+  "prefer-bigint-over-int",
+  # SMALLINT is intentional for bounded domain values (year, 1-5 ratings)
+  "prefer-bigint-over-smallint",
+  # Dropping legacy tables/columns in consolidation migrations is intentional
+  "ban-drop-table",
+  "ban-drop-column",
+  # Column renames are coordinated with the Rust code in the same commit
+  "renaming-column",
+  # Tables are small at migration time; NOT NULL + FK scans are acceptable
+  "adding-not-nullable-field",
+  # Dropping NOT NULL is intentional when migrating from single-owner to multi-owner models
+  "ban-drop-not-null",
+  "adding-foreign-key-constraint",
+  # Column type changes on UNLOGGED transient tables (pending_uploads) are safe
+  "changing-column-type",
+  # Same scale rationale as adding-not-nullable-field: tables are small at
+  # migration time, the rewrite completes well inside our deploy timeout.
+  # Covers STORED generated columns used by the entity-search migrations
+  # (0037+ in project, 0040+ in profile, 0013+ in quote). Revisit if any
+  # table grows past ~1M rows — at that point switch to the nullable
+  # column + trigger pattern.
+  "adding-field-with-default",
+]
+
+# Our migration tool wraps each file in a transaction.
+assume_in_transaction = true

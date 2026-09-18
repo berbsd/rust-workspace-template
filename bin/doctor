@@ -1,0 +1,356 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Doctor Script
+# =============================================================================
+# Checks the health of this workspace's development environment — everything
+# `bin/bootstrap.sh` installs, plus a few things bootstrap doesn't cover
+# (dependency freshness, git hooks actually installed, the Claude Code
+# integrations this workspace ships). Read-only: never installs or changes
+# anything, only reports. Run `bin/bootstrap.sh` to fix what this finds
+# missing.
+#
+# Usage:
+#   ./bin/doctor
+#   ./bin/doctor --verbose   # also print installed versions
+#
+# Exit code: 0 if every REQUIRED check passes (warnings/optional gaps do not
+# fail the run), non-zero if any required tool is missing or misconfigured.
+# =============================================================================
+
+set -u
+
+VERBOSE=0
+[[ "${1:-}" == "--verbose" || "${1:-}" == "-v" ]] && VERBOSE=1
+
+OK_COUNT=0
+WARN_COUNT=0
+FAIL_COUNT=0
+
+# =============================================================================
+# Helper Functions
+# =============================================================================
+
+section() {
+  echo ""
+  echo "=============================================="
+  echo "$1"
+  echo "=============================================="
+}
+
+ok() {
+  echo "  [ok]   $1"
+  OK_COUNT=$((OK_COUNT + 1))
+}
+
+warn() {
+  echo "  [warn] $1"
+  WARN_COUNT=$((WARN_COUNT + 1))
+}
+
+fail() {
+  echo "  [MISS] $1"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+}
+
+info() {
+  [[ "$VERBOSE" -eq 1 ]] && echo "         $1"
+  return 0
+}
+
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+# `cmd --version` output varies too much to parse reliably across all these
+# tools (some print to stderr, some have multi-line banners) — report
+# presence and let the version show up in --verbose via each tool's own
+# --version invocation, on a best-effort basis only.
+report_tool() {
+  local name="$1" required="$2"
+  if command_exists "$name"; then
+    ok "$name"
+    if [[ "$VERBOSE" -eq 1 ]]; then
+      local v
+      v=$("$name" --version 2>&1 | head -1)
+      info "$v"
+    fi
+  elif [[ "$required" == "required" ]]; then
+    fail "$name — not found. Run bin/bootstrap.sh, or install manually."
+  else
+    warn "$name — not found (optional). Run bin/bootstrap.sh to install it."
+  fi
+}
+
+# =============================================================================
+# 1. Bootstrap dependencies
+# =============================================================================
+# Mirrors bin/bootstrap.sh exactly — if a tool is added there, add it here
+# too, or this drifts the way the audit scripts this workspace once had did.
+
+check_bootstrap_deps() {
+  section "1. Bootstrap dependencies"
+
+  echo "-- Prerequisites --"
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    report_tool brew optional
+  fi
+  report_tool rustup required
+  report_tool cargo required
+  report_tool direnv optional
+  report_tool taplo required
+  report_tool typos required
+  report_tool git-cliff required
+  report_tool lefthook required
+  report_tool betterleaks required
+  report_tool cog required
+
+  echo ""
+  echo "-- Rust toolchain components --"
+  if command_exists rustup; then
+    if rustup component list --installed 2>/dev/null | grep -q '^rustfmt'; then
+      ok "rustfmt component"
+    else
+      fail "rustfmt component — run: rustup component add rustfmt"
+    fi
+    if rustup component list --installed 2>/dev/null | grep -q '^clippy'; then
+      ok "clippy component"
+    else
+      fail "clippy component — run: rustup component add clippy"
+    fi
+    if rustup toolchain list 2>/dev/null | grep -q '^nightly'; then
+      ok "nightly toolchain (needed for cargo +nightly fmt)"
+    else
+      fail "nightly toolchain — run: rustup toolchain install nightly"
+    fi
+
+    if [[ -f "$(dirname "$0")/../rust-toolchain.toml" ]]; then
+      local pinned installed
+      pinned=$(grep -E '^channel' "$(dirname "$0")/../rust-toolchain.toml" | sed -E 's/.*"([^"]+)".*/\1/')
+      if rustup toolchain list 2>/dev/null | grep -q "^${pinned}"; then
+        ok "pinned toolchain $pinned is installed"
+      else
+        warn "pinned toolchain $pinned (from rust-toolchain.toml) not installed yet — the next cargo command in this workspace will auto-install it"
+      fi
+    fi
+  else
+    fail "rustup missing — cannot check toolchain components"
+  fi
+
+  echo ""
+  echo "-- Cargo subcommands --"
+  # Each of these installs as a cargo-<name> binary on PATH, invoked via
+  # `cargo <name>`, per bin/bootstrap.sh's install_cargo_tools.
+  report_tool cargo-nextest required
+  report_tool cargo-llvm-cov required
+  report_tool cargo-deny required
+  report_tool cargo-audit required
+  report_tool cargo-add required      # from cargo-edit
+  report_tool just required
+  report_tool cargo-watch optional
+  report_tool cargo-outdated required
+  report_tool cargo-machete required
+  report_tool cargo-udeps optional    # nightly-only, thorough unused-deps check
+  report_tool cargo-release optional
+  report_tool cargo-semver-checks optional
+}
+
+# =============================================================================
+# 2. Dependency freshness
+# =============================================================================
+
+check_updates() {
+  section "2. Are there updates available?"
+
+  echo "-- Workspace Rust dependencies (Cargo.toml) --"
+  if command_exists cargo-outdated; then
+    local repo_root
+    repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+    local out
+    out=$(cd "$repo_root" && cargo outdated -R 2>&1)
+    if echo "$out" | grep -qE '^\S+\s+\S+\s+\S+\s+\S+'; then
+      warn "outdated workspace dependencies found — run 'cargo outdated -R' for details"
+      info "$(echo "$out" | head -20)"
+    else
+      ok "workspace dependencies are up to date (per cargo outdated -R)"
+    fi
+  else
+    warn "cargo-outdated not installed — cannot check workspace dependency freshness. Run bin/bootstrap.sh."
+  fi
+
+  echo ""
+  echo "-- Bootstrap-installed CLI tools --"
+  if [[ "$(uname -s)" == "Darwin" ]] && command_exists brew; then
+    local outdated
+    outdated=$(brew outdated --formula 2>/dev/null | grep -E '^(direnv|taplo|typos-cli|git-cliff|lefthook|betterleaks|cocogitto)\b' || true)
+    if [[ -n "$outdated" ]]; then
+      warn "outdated Homebrew tools:"
+      echo "$outdated" | sed 's/^/         /'
+    else
+      ok "Homebrew-installed tools are up to date"
+    fi
+  else
+    warn "not on macOS or Homebrew unavailable — skipping CLI tool freshness check (check manually on Linux)"
+  fi
+
+  echo ""
+  echo "-- Rust toolchain itself --"
+  if command_exists rustup; then
+    local update_out
+    update_out=$(rustup check 2>&1 || true)
+    if echo "$update_out" | grep -qi "update available"; then
+      warn "a newer Rust toolchain is available — run 'rustup update' (and consider bumping rust-toolchain.toml)"
+      info "$(echo "$update_out")"
+    else
+      ok "Rust toolchains are current"
+    fi
+  fi
+}
+
+# =============================================================================
+# 3. Claude Code integrations this workspace ships
+# =============================================================================
+
+check_claude_integrations() {
+  section "3. Claude Code integrations"
+
+  local repo_root
+  repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+
+  echo "-- Context7 MCP server (.mcp.json) --"
+  if [[ -f "$repo_root/.mcp.json" ]]; then
+    if grep -q '"context7"' "$repo_root/.mcp.json"; then
+      ok ".mcp.json registers the context7 MCP server"
+    else
+      warn ".mcp.json exists but has no \"context7\" entry — documentation lookups won't use it"
+    fi
+  else
+    fail ".mcp.json is missing — no context7 MCP server registered"
+  fi
+
+  echo ""
+  echo "-- Project skills (.claude/skills/) --"
+  if [[ -d "$repo_root/.claude/skills" ]]; then
+    local count
+    count=$(find "$repo_root/.claude/skills" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')
+    if [[ "$count" -gt 0 ]]; then
+      ok "$count project skill(s) present under .claude/skills/"
+    else
+      warn ".claude/skills/ exists but is empty"
+    fi
+  else
+    warn "no .claude/skills/ directory found"
+  fi
+}
+
+# =============================================================================
+# 4. Tool readiness — git hooks actually installed
+# =============================================================================
+# The mechanical half of what the tool-readiness skill checks: are the hooks
+# lefthook.yml declares actually wired into .git/hooks, not just described in
+# a config file nobody ran `lefthook install` against. The qualitative half —
+# do these hooks actually catch anything, or do they pass on everything — is
+# a judgment call for a model to make; this script can't run a skill, so it
+# points at tool-readiness for that instead of attempting it here.
+
+check_git_hooks() {
+  section "4. Git hooks (tool-readiness)"
+
+  local repo_root
+  repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+
+  if ! git -C "$repo_root" rev-parse --git-dir >/dev/null 2>&1; then
+    warn "not inside a git repository yet — git hooks can't be installed until 'git init'"
+    return 0
+  fi
+
+  local git_dir
+  git_dir=$(git -C "$repo_root" rev-parse --git-dir)
+  # rev-parse gives a path relative to $repo_root for a normal (non-worktree)
+  # repo; make it absolute so the file checks below work regardless of cwd.
+  case "$git_dir" in
+    /*) : ;;
+    *) git_dir="$repo_root/$git_dir" ;;
+  esac
+
+  for hook in pre-commit commit-msg; do
+    local hook_path="$git_dir/hooks/$hook"
+    if [[ -f "$hook_path" ]] && grep -qi lefthook "$hook_path" 2>/dev/null; then
+      ok "$hook hook installed (lefthook)"
+    else
+      fail "$hook hook not installed — run 'lefthook install' (bin/bootstrap.sh does this automatically)"
+    fi
+  done
+
+  if [[ -f "$repo_root/lefthook.yml" ]]; then
+    ok "lefthook.yml present"
+  else
+    fail "lefthook.yml missing"
+  fi
+
+  echo ""
+  echo "  For a deeper audit — whether these hooks actually catch anything"
+  echo "  rather than merely being present and green — ask Claude Code to"
+  echo "  run the tool-readiness skill."
+}
+
+# =============================================================================
+# 5. Claude Code environment (best-effort, not specific to this project)
+# =============================================================================
+# These checks are about the local Claude Code installation, not this
+# workspace — they're only meaningful if you're using Claude Code at all,
+# and say nothing about whether this repo itself is healthy. Never fail the
+# script over these.
+
+check_claude_environment() {
+  section "5. Claude Code environment (informational — skip if not using Claude Code)"
+
+  if command_exists claude; then
+    local plugin_list
+    plugin_list=$(claude plugin list 2>/dev/null || true)
+    if echo "$plugin_list" | grep -qi superpowers; then
+      ok "superpowers plugin installed"
+    elif [[ -n "$plugin_list" ]]; then
+      warn "superpowers plugin not found in 'claude plugin list' output"
+    else
+      warn "could not determine plugin list (claude plugin list produced no output) — checking common install paths instead"
+    fi
+  fi
+
+  # Fall back to / corroborate with a filesystem check — the plugin list
+  # command above may not exist or may format output differently across
+  # Claude Code versions, so this is a second, independent signal.
+  if find "$HOME/.claude/plugins" -maxdepth 3 -iname "superpowers*" -print -quit 2>/dev/null | grep -q .; then
+    ok "superpowers plugin found under ~/.claude/plugins"
+  else
+    warn "superpowers plugin not found under ~/.claude/plugins — if you use Claude Code, consider installing it for the brainstorming/systematic-debugging/writing-plans skills it provides"
+  fi
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+
+main() {
+  echo "Doctor: checking this workspace's development environment"
+  [[ "$VERBOSE" -eq 1 ]] && echo "(verbose mode)"
+
+  check_bootstrap_deps
+  check_updates
+  check_claude_integrations
+  check_git_hooks
+  check_claude_environment
+
+  section "Summary"
+  echo "  $OK_COUNT ok, $WARN_COUNT warning(s), $FAIL_COUNT missing/failed"
+  echo ""
+
+  if [[ "$FAIL_COUNT" -gt 0 ]]; then
+    echo "Run ./bin/bootstrap.sh to install missing required tools, then re-run ./bin/doctor."
+    exit 1
+  fi
+
+  echo "Environment looks healthy."
+  exit 0
+}
+
+main "$@"

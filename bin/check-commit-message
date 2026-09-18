@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# =============================================================================
+# check-commit-message — enforce subject/body line length
+# =============================================================================
+# `cog verify` (wired into lefthook.yml's commit-msg hook) checks Conventional
+# Commits structure — type, scope, colon, description — but nothing about
+# line length; cocogitto's cog.toml has no config surface for that at all.
+# This script is the other half: a subject over 72 characters, or a body line
+# over 72 characters, fails the commit.
+#
+# Usage: bin/check-commit-message <path-to-commit-message-file>
+# (lefthook invokes this as `bin/check-commit-message {1}`.)
+# =============================================================================
+
+set -euo pipefail
+
+LIMIT=72
+
+if [[ $# -ne 1 ]]; then
+  echo "usage: check-commit-message <commit-message-file>" >&2
+  exit 2
+fi
+
+msg_file="$1"
+
+if [[ ! -f "$msg_file" ]]; then
+  echo "error: commit message file not found: $msg_file" >&2
+  exit 2
+fi
+
+violations=0
+line_num=0
+subject_seen=0
+
+while IFS= read -r line || [[ -n "$line" ]]; do
+  line_num=$((line_num + 1))
+
+  # git appends `#`-prefixed instructional comments to the message file for
+  # an interactive commit (`git commit` with no `-m`); those aren't part of
+  # the message and must not be linted.
+  [[ "$line" == \#* ]] && continue
+
+  length=${#line}
+
+  if [[ "$subject_seen" -eq 0 ]]; then
+    # The first non-comment line is the subject, regardless of its line
+    # number in the file — comments can precede it.
+    subject_seen=1
+    if [[ "$length" -gt "$LIMIT" ]]; then
+      echo "error: commit subject is $length characters (max $LIMIT):" >&2
+      echo "  $line" >&2
+      violations=$((violations + 1))
+    fi
+    continue
+  fi
+
+  if [[ "$length" -gt "$LIMIT" ]]; then
+    echo "error: commit body line $line_num is $length characters (max $LIMIT):" >&2
+    echo "  $line" >&2
+    violations=$((violations + 1))
+  fi
+done <"$msg_file"
+
+if [[ "$violations" -gt 0 ]]; then
+  echo "" >&2
+  echo "$violations line(s) over $LIMIT characters. Wrap the body; move detail" >&2
+  echo "that can't be wrapped (a URL, a stack trace) out of the subject." >&2
+  exit 1
+fi
+
+exit 0

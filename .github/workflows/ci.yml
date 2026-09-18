@@ -1,0 +1,192 @@
+# =============================================================================
+# CI Pipeline
+# =============================================================================
+# Runs on every push and pull request to main.
+# Mirrors `just check` locally: format, lint, test, typos, security.
+#
+# Jobs:
+#   check - Format, clippy, typos, cargo-deny
+#   test  - Run tests with nextest
+#
+# Caching strategy:
+#   - Swatinem/rust-cache: cargo registry, git deps, target dir
+#   - taiki-e/install-action: pre-built binaries (no compilation)
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+
+    env:
+      # Must match the Test job's value, and that is the whole point of it
+      # being here — this job is the one that *saves* the `ci-cargo` cache
+      # Test restores. Cargo's fingerprint includes profile settings, so two
+      # jobs disagreeing about `debug` makes the restored `target/` unusable:
+      # Test would rebuild the workspace every run while still paying the disk
+      # cost of carrying the artifacts it cannot use. See the Test job for why
+      # the value is what it is.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.98.1
+        with:
+          components: clippy
+
+      - name: Install Rust nightly (for rustfmt)
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-cargo
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@cargo-deny
+
+      - name: Install typos-cli
+        uses: taiki-e/install-action@typos-cli
+
+      - name: Format check
+        run: cargo +nightly fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features
+
+      - name: Typos
+        run: typos
+
+      - name: Security and license check
+        run: cargo deny check
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: check
+
+    # A backstop, not the fix. `.config/nextest.toml` kills an individual hung
+    # test at five minutes; this catches a hang that nextest itself cannot see
+    # — a stuck build, a wedged service container, a test that ignores its own
+    # termination. GitHub's default is 360 minutes, which is a long time to
+    # wait to discover a job is stuck rather than slow. Tighten this once a
+    # real green run establishes the workspace's actual healthy runtime.
+    timeout-minutes: 60
+
+    # Integration tests use #[sqlx::test], which treats DATABASE_URL as a
+    # template: it connects there, issues a CREATE DATABASE for a throwaway
+    # clone per test, applies migrations, and drops it. Without a live
+    # server every one of them fails, so this service is what makes the
+    # DB-backed half of the suite runnable at all.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # Without a health check the job races the container: nextest starts
+        # while Postgres is still initialising and the first tests fail to
+        # connect.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+
+      # Debug info is the bulk of what the linker writes, and this job links
+      # every test binary in the workspace — which is what filled the runner's
+      # disk and crashed `rust-lld` (see the disk-reclaim step below).
+      #
+      # `line-tables-only` rather than `0`: a panicking test still reports the
+      # function and line it panicked on, which is most of what a backtrace is
+      # for here. Dropping to `0` would save a little more and leave a CI
+      # failure reporting addresses.
+      #
+      # Set on `dev` rather than `test` because test binaries build with the
+      # `test` profile, which inherits `dev`, and their dependencies build with
+      # `dev` outright — so this reaches both. There is no `[profile.test]` in
+      # the workspace manifest for it to be overridden by.
+      #
+      # The Check job sets the same value, and has to: it saves the `ci-cargo`
+      # cache this job restores, and cargo will rebuild anything whose profile
+      # fingerprint disagrees.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # `ubuntu-latest` ships ~14 GB free, and this job wants it for a debug
+      # build of the whole workspace plus a restored `target/` cache. When it
+      # runs out, the failure does NOT say "no space left": `rust-lld` writes
+      # its output through a memory mapping, so a block the filesystem cannot
+      # allocate faults as
+      #
+      #   collect2: fatal error: ld terminated with signal 7 [Bus error]
+      #
+      # which reads as a linker bug rather than a full disk.
+      #
+      # Inline `rm` rather than one of the disk-reclaim actions: it is four
+      # paths this build provably never reads, and it costs no supply-chain
+      # surface on a runner holding a DATABASE_URL and a registry token.
+      #
+      # Deliberately NOT pruning Docker images — the Postgres service
+      # container is running by now, and its image is in that set.
+      - name: Reclaim runner disk
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+            /usr/local/.ghcup /usr/share/swift || true
+          df -h /
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.98.1
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-cargo
+          save-if: false
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      # --no-fail-fast: report every failure in the run rather than stopping at
+      # the first. A red run that understates the problem is harder to work
+      # than one that lists it.
+      #
+      # This workspace starts small enough to run every test on every push. If
+      # it grows to the point where a full `nextest run` stops finishing in
+      # CI's time/disk budget, scope this to the packages that matter most
+      # (e.g. `-p <service>` per job, or `--lib --bins` to skip slow `_it`
+      # integration binaries) rather than letting the job silently time out —
+      # see the disk-reclaim step above for the failure mode that looks like a
+      # linker bug but is actually a full disk.
+      - name: Run tests
+        run: cargo nextest run --no-fail-fast --all-features
+
+      # `always()`, so this reports on the run that fails as well as the one
+      # that passes — a full disk is only visible here, and the linker crash it
+      # causes names neither disk nor space. Pair it with the figure the
+      # reclaim step printed to see what the build actually consumed.
+      - name: Report disk after build
+        if: always()
+        run: df -h /

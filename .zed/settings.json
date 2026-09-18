@@ -1,0 +1,33 @@
+{
+  "file_scan_exclusions": ["**/.DS_Store", ".git", "target/"],
+  "languages": {
+    "Rust": {
+      "formatter": {
+        "external": {
+          "command": "rustup",
+          "arguments": ["run", "nightly", "rustfmt", "--edition", "2024"],
+        },
+      },
+      "format_on_save": "on",
+    },
+  },
+  "lsp": {
+    "rust-analyzer": {
+      "initialization_options": {
+        "cargo": {
+          "features": "all",
+          "extraEnv": {
+            "LIBCLANG_PATH": "/opt/homebrew/opt/llvm/lib",
+            "LIBRARY_PATH": "/opt/homebrew/lib",
+          },
+        },
+        "check": {
+          "extraEnv": {
+            "LIBCLANG_PATH": "/opt/homebrew/opt/llvm/lib",
+            "LIBRARY_PATH": "/opt/homebrew/lib",
+          },
+        },
+      },
+    },
+  },
+}

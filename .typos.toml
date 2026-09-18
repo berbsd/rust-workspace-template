@@ -1,0 +1,20 @@
+[files]
+# Mirrors lefthook.yml's per-command `exclude:` lists, which apply when
+# {staged_files} is passed explicitly — that bypasses this file's excludes,
+# so a full/manual `typos` run stays quiet only if the same paths are listed
+# here too.
+extend-exclude = ["target/", "*.lock", ".claude/"]
+
+[default]
+# Base64-encoded examples (JWTs, cursors) start with `ey` and produce
+# false positives. Skip any contiguous base64 run anchored on `ey`.
+extend-ignore-re = [
+  "ey[A-Za-z0-9+/=]{16,}",
+  # Hyphenated "mis-" compounds (mis-tap, mis-fire, ...) split at the hyphen
+  # and get read as the truncated word `mis`.
+  "\\bmis-[a-z]+\\b",
+]
+
+[default.extend-words]
+# ISO 3166-2 state code for North Dakota — typos wants to fix it to AND.
+ND = "ND"

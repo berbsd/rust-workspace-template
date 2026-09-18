@@ -1,0 +1,36 @@
+[package]
+authors.workspace    = true
+categories.workspace = true
+description          = "Shared wire types: the API error envelope and keyset pagination"
+edition.workspace    = true
+keywords.workspace   = true
+license.workspace    = true
+name                 = "common-types"
+publish.workspace    = true
+readme.workspace     = true
+version              = "0.1.0"
+
+[lints]
+workspace = true
+
+[dependencies]
+axum       = { workspace = true }
+base64     = { workspace = true }
+chrono     = { workspace = true, features = ["serde"] }
+garde      = { workspace = true, optional = true, features = ["derive"] }
+serde      = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror  = { workspace = true }
+utoipa     = { workspace = true, optional = true }
+
+[dev-dependencies]
+# "serde" is required here, not just pulled in by feature unification with a
+# workspace member that happens to also depend on uuid — this crate's own
+# tests must compile standing alone (e.g. a workspace generated with
+# --no-example, which has no other uuid consumer to unify features with).
+uuid = { workspace = true, features = ["serde", "v7"] }
+
+[features]
+default = []
+garde   = ["dep:garde"]
+openapi = ["dep:utoipa"]

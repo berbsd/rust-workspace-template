@@ -1,0 +1,56 @@
+# =============================================================================
+# cargo-nextest configuration
+# =============================================================================
+# Documentation: https://nexte.st/docs/configuration/
+# =============================================================================
+
+[profile.default]
+# Kill a test that has run for five minutes, and report it as TIMEOUT.
+#
+# Without this, one hung test hangs the whole run: CI can sit for hours after
+# most tests finished, until the job hits its own ceiling and gets cancelled
+# with no summary at all — no test names, nothing to act on.
+#
+# `terminate-after` turns that into a legible failure list instead of a wall
+# of SLOW warnings with no conclusion.
+#
+# Five periods rather than fewer: DB-backed `#[sqlx::test]` suites each create
+# a database, run migrations, and drop it, against one Postgres container
+# shared by the whole run. Under that contention a legitimately slow test can
+# take a while, and killing a real test would be worse than the minute it
+# costs to be sure.
+slow-timeout = { period = "60s", terminate-after = 5 }
+
+# =============================================================================
+# Test groups
+# =============================================================================
+
+[test-groups]
+# Cap how many DB-backed tests may be in flight against the one shared
+# Postgres at a time.
+#
+# Every `#[sqlx::test]` issues CREATE DATABASE, applies the full migration set
+# to the clone, runs, then DROPs it. `CREATE DATABASE` copies a template and
+# Postgres serialises concurrent copies of the same template, so past a point
+# extra parallelism buys nothing and just deepens the queue each test waits
+# in — which is the contention `terminate-after = 5` above is paying for.
+#
+# Eight rather than a smaller number: the default server ceiling is 100
+# connections, and eight concurrent tests each holding a pool plus the
+# maintenance connection used for CREATE/DROP leaves real headroom without
+# throttling a suite that is mostly DB-backed. Lower it before suspecting
+# individual tests if you move to a bigger CI runner and this doesn't bind.
+database = { max-threads = 8 }
+
+# Every package containing at least one `#[sqlx::test]`. A package missing
+# from this list is not a failure, it just runs unbounded as it does today, so
+# the list going stale degrades to the status quo rather than breaking a run.
+#
+# Regenerate after adding a service:
+#   cargo metadata --no-deps --format-version 1 | \
+#     jq -r '.packages[] | "\(.name) \(.manifest_path | rtrimstr("/Cargo.toml"))"' | \
+#     while read -r n d; do \
+#       grep -rqls 'sqlx::test' --include='*.rs' "$d" && echo "$n"; done | sort -u
+[[profile.default.overrides]]
+filter     = 'package(/^(example)$/)'
+test-group = 'database'

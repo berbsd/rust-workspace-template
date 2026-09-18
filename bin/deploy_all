@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# deploy_all — placeholder. This template has no deploy target configured.
+#
+# The source platform this template was derived from wired this up to a
+# separate infra repo; that's out of scope here. Wire this script up to your
+# own infrastructure (Cloud Run, Fly, ECS, whatever you use) — see README.md.
+
+echo "No deploy target configured for this template yet." >&2
+echo "Wire bin/deploy_all up to your infrastructure — see README.md." >&2
+exit 1
