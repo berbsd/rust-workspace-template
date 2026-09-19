@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.4] - 2026-09-19
+
+### Miscellaneous
+
+- Gitignore docs/plans and docs/specs content, keep folders
+- Strip leaked project-specific refs from skill docs, config
+
 ## [0.1.3] - 2026-09-18
 
 ### Bug Fixes
