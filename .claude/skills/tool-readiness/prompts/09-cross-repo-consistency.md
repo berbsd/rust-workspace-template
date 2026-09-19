@@ -6,17 +6,17 @@ Compare the same tool across every repo. Find tools invoked differently, configu
 
 Knowledge does not travel between repos on its own. A trap documented carefully in one repo's config header stays there while a sibling repo walks straight into it.
 
-Verified on 2026-09-09 across `infra`, `api` and `web`:
+A realistic shape, across three sibling repos that share a secret scanner, a spell checker, and a commit-message linter:
 
-- **`infra` and `api` both loaded 417 gitleaks rules. `web` loaded 0.** The `[extend] useDefault = true` requirement was documented at length in `infra`'s own `.gitleaks.toml` header and in its CLAUDE.md. `web` had never received it, and its secret gate had been inert since the config was authored.
-- **`api` knew that `typos {staged_files}` bypasses `extend-exclude` and mirrored its excludes into lefthook.** `web` passed `{staged_files}` too, relying on a `_typos.toml` that therefore did nothing.
-- **`web` used `gitleaks protect --staged` with no `--redact`;** the other two used `betterleaks git . --staged --no-banner --redact`. Same job, three differences: tool, subcommand form, and whether a caught secret is printed in cleartext to the terminal and any log capturing the failed commit.
+- **Two repos load 417 gitleaks rules. The third loads 0.** The `[extend] useDefault = true` requirement was documented at length in one repo's own `.gitleaks.toml` header — but that documentation never reached the sibling, whose secret gate had been inert since the config was authored.
+- **One repo knows that `typos {staged_files}` bypasses `extend-exclude` and mirrors its excludes into lefthook.** A sibling passes `{staged_files}` too, relying on its own `.typos.toml` excludes, which therefore do nothing.
+- **One repo runs the scanner with no `--redact` equivalent;** the others redact. Same job, three differences: tool, subcommand form, and whether a caught secret prints in cleartext to the terminal and any log capturing the failed commit.
 
-None of these were disagreements about policy. All three were one repo not having heard.
+None of these are disagreements about policy. Each is one repo not having heard what a sibling already learned.
 
 ## Scope
 
-Every sibling repo. Establish the list first rather than assuming three:
+Every sibling repo. Establish the list first rather than assuming a fixed number — adjust the glob below to wherever this machine actually checks repos out:
 
 ```bash
 for d in ~/repos/*/; do
@@ -33,7 +33,7 @@ Include repos with **no** hook manager — a missing config is the loudest incon
 Build it mechanically. This is the check's core artefact:
 
 ```bash
-for r in infra api web; do
+for r in $(ls ~/repos/); do
   d=~/repos/$r; [ -d "$d" ] || continue
   echo "── $r ──"
   ( cd "$d"
@@ -48,11 +48,11 @@ Any row that differs is a finding until justified.
 
 ### 2. Same tool, different invocation
 
-Diff the actual command strings. Legitimate differences exist (`bin/validate` is infra-specific; `cargo` commands are api-specific), but the *shared* tools — secret scanner, spell checker, commit-message linter — should be byte-identical.
+Diff the actual command strings. Legitimate differences exist (a repo-specific validation script, language-specific commands like `cargo` vs `npm`), but the *shared* tools — secret scanner, spell checker, commit-message linter — should be byte-identical.
 
 ### 3. Same tool, different config filename
 
-`api` uses `.typos.toml`; `web` uses `_typos.toml`. Both are valid names, so this is cosmetic — but record it, because it makes the next mechanical sweep miss a file. Prefer one name across repos when the churn is free; do not rename purely for tidiness if history cost is real.
+`.typos.toml` vs `_typos.toml`, `.gitleaks.toml` vs `.betterleaks.toml` — both names are valid for the same tool, so this is cosmetic, but record it anyway: it's exactly the kind of thing that makes the next mechanical sweep miss a file. Prefer one name across repos when the churn is free; do not rename purely for tidiness if history cost is real.
 
 ### 4. A trap documented in one repo and nowhere else
 
@@ -85,7 +85,7 @@ Then, per repo, the canary from check #3 — consistency of configuration is not
 
 ## Report format
 
-| | infra | api | web |
+| | repo-a | repo-b | repo-c |
 |---|---|---|---|
 | Secret scanner | `betterleaks git . --staged --redact` | same | **`gitleaks protect`, no `--redact`** |
 | Rules loaded | 417 | 417 | **0** |

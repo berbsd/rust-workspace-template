@@ -6,7 +6,7 @@ Find suppressions that silence more than the thing they were written for — abo
 
 The path-scoped suppression is the single most damaging pattern in this category, because it looks like precision and behaves like a blindfold.
 
-`infra/.gitleaks.toml` documents the mechanism in its own header: betterleaks compiles allowlist `paths` into its **prefilter** — the same skip expression that drops `node_modules` and binaries — so matching files are removed from the corpus *before any rule runs*, and the allowlist's own `regexes` are never consulted. `matchCondition = "AND"` does not change this. The result is a scan with zero applicable rules over those files, reporting "no leaks found" and exiting 0. The same repo's CLAUDE.md states the rule flatly: *don't whitelist files in `.gitleaks.toml` to silence it.*
+This template's own `.gitleaks.toml` documents the mechanism in its own header: betterleaks compiles allowlist `paths` into its **prefilter** — the same skip expression that drops `node_modules` and binaries — so matching files are removed from the corpus *before any rule runs*, and the allowlist's own `regexes` are never consulted. `matchCondition = "AND"` does not change this. The result is a scan with zero applicable rules over those files, reporting "no leaks found" and exiting 0. That's why the header states the rule flatly: never give an allowlist a `paths` key; scope by content instead.
 
 The consequence is not just today's blindness. A path suppression also silences **every secret added to that file in future**, by anyone, forever.
 

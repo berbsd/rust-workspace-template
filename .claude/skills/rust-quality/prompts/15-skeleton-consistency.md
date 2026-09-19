@@ -49,7 +49,7 @@ instead of via its own `router(pool)` function, or skipping graceful shutdown wi
 
 - Root struct named `Config`, derives `Clone, Debug, Deserialize, Validate`.
 - Every leaf field carries an `/// Env: `VAR` (default … | required)` line, and every nested-config field an `/// Env prefix:` line — flag missing lines, and flag any surviving `# Environment Variables` table on the struct, which this convention replaces (a table on the struct outlives the fields it describes; a `///` line on each field can't drift from it).
-- Fields use `#[serde(rename = "...")]` to define env var prefixes consistently with other services (`service`, `postgres`, `pubsub`, `gcs`, etc.).
+- Fields use `#[serde(rename = "...")]` to define env var prefixes consistently with other services — whatever prefix convention this workspace's `Config` types already use (e.g. `service`, `postgres`, and any other shared sub-config).
 - Shared sub-configs (`ServiceConfig`, `PostgresConfig`, `HttpClientConfig`, etc.) come from the workspace crates listed in CLAUDE.md — not redefined locally.
 - Every field carries `#[garde(...)]` (or `#[garde(skip)]` with justification) — no silent omissions.
 - No service-specific override of `Default` for shared types — defaults live in the owning crate.
@@ -93,10 +93,9 @@ Produce a matrix view — services × skeleton concerns:
 
 ```
               | main.rs       | config.rs                | metrics.rs
-auth          | reference     | reference                | reference
-example       | OK            | missing env-vars doc     | OK
-orders        | tracing init  | redefines PostgresConfig | wrong prefix
-invite        | no shutdown   | OK                       | missing platform metrics
+example       | reference     | reference                | reference
+service-b     | tracing init  | redefines PostgresConfig | wrong prefix
+service-c     | no shutdown   | OK                       | missing platform metrics
 ```
 
 Then list each cell's drift in detail with file:line. End with a recommendation on convergence direction.

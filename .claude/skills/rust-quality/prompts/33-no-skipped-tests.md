@@ -29,14 +29,14 @@ A skipped test appears in the run, prints a reassuring line, and contributes to 
 green summary — so nobody counts it, and the gap it leaves is invisible precisely
 where someone believed they had cover.
 
-This workspace carried **51** such tests behind `#[ignore = "requires
-TEST_DATABASE_URL"]` and friends. Every one of them passed the moment it was
-pointed at the database `just db-ensure` had been starting all along. The
-attribute had outlived its reason by years, and nothing in the suite could say
-so, because a skip is indistinguishable from a pass in the summary line.
-
-One of them was a regression test written the same week to pin a deliberate
-behaviour change. It had never executed.
+A workspace can accumulate tests behind `#[ignore = "requires
+TEST_DATABASE_URL"]` and friends for years without anyone noticing — often
+long after the excuse stopped being true (e.g. once `just db-ensure` starts a
+throwaway database on demand, "requires a database" is no longer a real
+blocker). Nothing in the suite says so, because a skip is indistinguishable
+from a pass in the summary line. A regression test written to pin a
+deliberate behaviour change is just as vulnerable to this: if it's ignored,
+it has never actually executed, no matter how carefully it was written.
 
 ## How to run this check
 
@@ -87,6 +87,7 @@ behaviour change. It had never executed.
 - ` ```no_run ` doctests — they compile and type-check, which is the point
 - `#[cfg(feature = "...")]` on a test **module**, *provided* the feature is on by
   default or the workspace build enables it. If it is not, the tests are skipped
-  in exactly the way this check exists to catch, and it should be reported —
-  `circuit-breaker` hid eight tests behind a non-default feature this way, and
-  the gap was invisible because the suite was green without them.
+  in exactly the way this check exists to catch, and it should be reported — a
+  test module gated behind a non-default feature is invisible in exactly the
+  same way an `#[ignore]`'d test is: the suite is green without it, and nobody
+  notices the gap.

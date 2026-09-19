@@ -148,9 +148,8 @@ let event = MyEvent::deserialize(payload)?;
 Same error type (`serde_json::Error`), so `?` propagation is unchanged.
 Highest-value when the target struct is much smaller than the payload
 (e.g. an enum of Copy typed-ids parsed from a rich event body), and in
-event-ingest match arms where the anti-pattern copy-pastes across every
-arm. Exemplars of the fix: an event router's dispatch match and a relay
-ingest service.
+any dispatch/ingest match arm where the anti-pattern copy-pastes across
+every arm.
 
 #### 8. Serialize Once, at the Wire/Storage Boundary
 
@@ -179,8 +178,7 @@ failures from database failures. Note: byte-stability of the *stored*
 form only holds on `jsonb` columns (Postgres normalizes key order);
 plain `json` columns preserve the textual difference between a
 `Value`-tree path (alphabetical keys) and direct struct serialization
-(declaration order). Exemplar of the fix: the `outbox` crate's enqueue
-path.
+(declaration order).
 
 ### Patterns to Flag
 

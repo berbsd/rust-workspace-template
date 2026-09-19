@@ -6,17 +6,9 @@ Classify every hook command as read-only or mutating, and verify the concurrency
 
 `parallel: true` is safe **if and only if** every command in the stage is read-only. Two commands that rewrite the same staged files race on the file contents; two that run `git add` race on `.git/index.lock`, which is a single global lock.
 
-The three repos here differ, and each is correct for its own contents:
+This template's own `lefthook.yml` is the case in point: `rustfmt {staged_files}` + `stage_fixed: true` mutates the staged files and re-stages them, and its own comment says exactly why the whole `pre-commit` stage is `piped: true` rather than `parallel: true` — running a mutating command concurrently with anything else would race on file contents and on `.git/index.lock`. A repo whose hook commands are *all* read-only (a linter that only reports, a spell-checker, a secret scanner) can safely run them in parallel; the moment even one command writes back to the working tree or the index, that stops being true for the whole stage.
 
-| Repo | Mutating commands | Setting |
-|---|---|---|
-| `infra` | none — `bin/validate`, `typos`, `betterleaks` all read | `parallel: true` |
-| `api` | `rustfmt {staged_files}` + `stage_fixed: true` | unset (false) |
-| `web` | `eslint --fix … && git add`, `prettier --write … && git add` | `parallel: false` |
-
-`web` is the strongest case: two commands rewrite the same files *and* both call `git add`. In parallel that is two races at once. Flipping it to `true` would not be faster, it would be corrupt-or-crash.
-
-`api`'s config also records the sharper version of this bug, from commit `7ac7d0c0`: `cargo fmt` takes no file scope, so it reformats **every** dirty `.rs` file in the tree and `stage_fixed` then adds them all — a commit touching one file silently absorbed another session's uncommitted work, under a message describing none of it. The fix was `rustfmt {staged_files}`, not a concurrency setting.
+The sharper version of this same bug: a workspace-wide formatter invoked without file scope (`cargo fmt` instead of `rustfmt {staged_files}`) reformats **every** dirty file in the tree, and `stage_fixed` then stages all of them — a commit meant to touch one file can silently absorb another session's uncommitted work, under a message describing none of it. The fix is file-scoping the formatter, not a concurrency setting.
 
 ## Scope
 
@@ -38,7 +30,7 @@ Any overlap between a mutating command and `parallel: true` is a finding. There 
 
 ### 2. A workspace-wide formatter in a staged-files hook
 
-The `7ac7d0c0` shape. Flag any formatter invoked without file scope (`cargo fmt`, `prettier --write .`, `eslint --fix .`) in a hook that also stages what it changed. Scope it to `{staged_files}`.
+The shape described above. Flag any formatter invoked without file scope (`cargo fmt`, `prettier --write .`, `eslint --fix .`) in a hook that also stages what it changed. Scope it to `{staged_files}`.
 
 ### 3. Two formatters over the same files
 
@@ -50,7 +42,7 @@ The `7ac7d0c0` shape. Flag any formatter invoked without file scope (`cargo fmt`
 
 ### 5. Mutation in an assertion-only location
 
-A directory or stage whose contract is "assert, do not act" should contain nothing that writes. `infra` states this for `bin/post-deploy.d/`, with the tell: *a member that always succeeds is doing something other than asserting.* Note the runner itself may legitimately mutate — `bin/post-deploy` calls `bin/snapshot`, which rewrites `deployments/*.json` — so a sweep dirties the working tree. Know which layer is allowed to write.
+A directory or stage whose contract is "assert, do not act" should contain nothing that writes. If a repo has a convention like this (a `checks.d/`-style directory of independent verification scripts, or similar), the tell for a violation is the same either way: *a member that always succeeds is doing something other than asserting.* A wrapper script that calls into it may legitimately mutate elsewhere (writing a report, updating a cache) — know which layer is allowed to write, and don't let a hook stage blur the two.
 
 ## Fixing
 
@@ -75,7 +67,7 @@ Run it against a realistic staged change, not a clean tree — a formatter with 
 
 | Command | Writes files? | Touches index? | Safe in parallel? |
 |---|---|---|---|
-| `bin/validate` | no | no | yes |
+| `betterleaks git . --staged` | no | no | yes |
 | `typos {staged_files}` | no | no | yes |
 | `rustfmt {staged_files}` + `stage_fixed` | **yes** | **yes** | **no** |
 

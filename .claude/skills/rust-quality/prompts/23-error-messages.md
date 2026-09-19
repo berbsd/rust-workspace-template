@@ -4,7 +4,7 @@ Bring `#[error("...")]` strings and inline error constructions across `crates/` 
 
 ## Why
 
-Most domain error variants flow to the wire as `ApiErrorBody.message`. The workspace has ~315 `#[error(...)]` strings; today they drift in casing (Title vs lowercase, ratio ~19/71), in tone ("Failed to" vs "Could not" vs "Unable to"), and in wording for identical semantics (`"User not found"` vs `"user not found"` vs `"unknown user"`). The result: a client doing fuzzy matching on `.message` sees different shapes from different services, and the SPA's error toast is inconsistent across the product. None of this is enforceable by clippy.
+Most domain error variants flow to the wire as `ApiErrorBody.message`. As a workspace's `#[error(...)]` strings accumulate across crates and services, they tend to drift in casing (Title vs lowercase), in tone ("Failed to" vs "Could not" vs "Unable to"), and in wording for identical semantics (`"User not found"` vs `"user not found"` vs `"unknown user"`). The result: a client doing fuzzy matching on `.message` sees different shapes from different services, and any UI that surfaces the message directly looks inconsistent across the product. None of this is enforceable by clippy.
 
 ## Cross-references (do not duplicate)
 

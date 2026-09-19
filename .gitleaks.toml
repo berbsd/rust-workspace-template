@@ -25,12 +25,6 @@
 [extend]
 useDefault = true
 
-# Placeholder UUID used as a fixture subject id across tests.
-[[allowlists]]
-description = "Fixture rauthy_sub UUID (crates/common-types/src/normalize.rs)"
-regexTarget = "match"
-regexes     = ['''a1b2c3d4-e5f6-7890-abcd-ef1234567890''']
-
 # Connection strings pointing at a loopback or deliberately-unresolvable host
 # cannot leak anything: the credential is only meaningful to a database that
 # exists on the developer's own machine. Matching on the HOST rather than on
@@ -52,23 +46,6 @@ regexes = [
 description = "CI Postgres service container credentials"
 regexTarget = "secret"
 regexes     = ['''^postgres$''']
-
-# Seed passwords for the demo dataset. Not credentials for any real account.
-# `SquadriDemo!2026` is the pre-rebrand value and `test-password` a unit-test
-# fixture; both survive only in history (commits d0c5f4d and bec28e9), so they
-# still have to be listed for a history scan to come back clean. Exact literals
-# rather than a path scope: see the `paths` warning in the header.
-[[allowlists]]
-description = "Demo seed passwords, current and historical"
-regexTarget = "match"
-regexes = [
-  '''ExampleDemo!2026''',
-  '''SquadriDemo!2026''',
-  '''test-password''',
-  # Throwaway override value in a deleted unit test (bec28e9). Matched with
-  # its surrounding context so the bare word stays a finding elsewhere.
-  "PASSWORD: 'other'",
-]
 
 # The canary fixture documented in the tool-readiness skill
 # (.claude/skills/tool-readiness/prompts/03-gate-falsifiability.md), which

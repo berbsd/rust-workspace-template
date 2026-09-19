@@ -6,13 +6,13 @@ Prove every gate can fail, with a fixture the tool actually reacts to. A gate th
 
 Checks #1 and #2 establish that rules loaded and the config applies. Neither proves the tool will *act*. The only evidence for that is watching it fail on a planted defect and pass once the defect is removed.
 
-The trap that makes this harder than it sounds: **your canary may be allowlisted.** Verified on 2026-09-09, all three of these produced `exit 0` from a correctly configured secret scanner:
+The trap that makes this harder than it sounds: **your canary may be allowlisted.** All three of these can produce `exit 0` from a correctly configured secret scanner, each for a different reason, and only one of the three reasons is the actual bug:
 
-- `AKIAIOSFODNN7EXAMPLE` — AWS's own documented example key, which gitleaks deliberately ignores. A false negative that would have masked a genuinely broken gate.
+- `AKIAIOSFODNN7EXAMPLE` — AWS's own documented example key, which gitleaks deliberately ignores. A false negative that would mask a genuinely broken gate.
 - A **randomly generated** `AKIA` + 16 chars — the AWS rule needs more context than a well-shaped string, so a random key alone triggers nothing.
 - The same random key while the config loaded **0 rules** — the real bug, invisible behind the two fixture failures above.
 
-The fixture that did work, and which `infra/.gitleaks.toml` prescribes in its own header:
+The fixture that reliably fires, and which this repo's own `.gitleaks.toml` prescribes in its own header comment:
 
 ```bash
 printf 'k="sk_live_51QwErTyUiOpAsDfGhJkLzXcV"' > /tmp/canary/canary.txt
@@ -30,10 +30,10 @@ A tool is not "working" until it has been proven at every layer that stands betw
 | **2. Through the manager** | `lefthook run pre-commit --command <name>` | the hook entry's `run:`, `glob:` and `exclude:` select this file and the exit code propagates |
 | **3. Through the real gate** | `git commit -m "canary"` | the manager is installed into `.git/hooks` and the commit is actually **refused** |
 
-**Report a gate as working only with all three recorded.** The gaps between rungs are real failures, each observed in this codebase:
+**Report a gate as working only with all three recorded.** The gaps between rungs are real, common failure modes, not edge cases:
 
 - **1 passes, 2 fails** — the tool works; the glob does not match the file, or the config's exclusions are bypassed by `{staged_files}` (check #2), so the hook entry never inspects it.
-- **2 passes, 3 fails** — the command works; `lefthook install` was never run in this checkout, so `.git/hooks/pre-commit` does not exist and every commit sails through. `bin/preflight` guards exactly this: *"An installed binary is not an installed hook … without it every tool above is present and NOTHING runs at commit time."*
+- **2 passes, 3 fails** — the command works; `lefthook install` was never run in this checkout, so `.git/hooks/pre-commit` does not exist and every commit sails through. An installed binary is not an installed hook — a repo can have every tool above present and correctly configured and still have NOTHING run at commit time, because nothing ever wired `lefthook` into `.git/hooks`.
 - **3 "passes" vacuously** — the commit succeeded because the gate did not run, not because the content was clean. Always assert on `git log --oneline -1`: HEAD must be **unchanged** after a canary commit attempt.
 
 Rung 3 is the one people skip because it is inconvenient — it needs a throwaway file and a reset. Skip it and you are testing a command, not a gate.

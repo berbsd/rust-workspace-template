@@ -489,25 +489,26 @@ idempotency is Check 4 and index *presence* is Checks 1–2; 27 governs only how
 **named and laid out**. Six sub-rules:
 
 **27.1 — Singular schema = service name.** A service's schema is the **singular** service
-directory name — `services/<name>/` → schema `<name>` (`widget`, `vendor`, `account`,
-`asset`, `catalog`, `upload`, `ledger`, `depot`, `order`, `memo`, …).
-- **Reserved-word rule:** when the singular name is a SQL reserved word, avoid it by renaming
-  the service, not by pluralising the schema. (The old `member` service used schema `members`
-  until it was renamed to `account`, retiring the sole exception.) Any deviation must
-  carry a comment.
+directory name — `services/<name>/` → schema `<name>`. This template's own example follows it:
+`services/example/` → schema `example` (see `services/example/migrations/0001_schema.sql`).
+- **Reserved-word rule:** when the singular name is a SQL reserved word (e.g. a service
+  naturally called `order` or `user`), avoid it by renaming the service, not by pluralising
+  the schema. Any deviation must carry a comment.
 - Flag any `CREATE SCHEMA` or schema-qualified table using a plural or non-service-matching
-  schema (e.g. a stray `catalogs.`, `uploads.`, `widgets.`).
+  schema (e.g. a stray `examples.`, or a schema that doesn't match any `services/<name>/`).
 
 **27.2 — Tables must not repeat the schema.** A table name must not begin with its own schema
 followed by `_` — the schema already namespaces it.
-- `member.member_photo` → `member.photo`; `widget.widget_members` → `widget.members`;
-  `ledger.ledger_requests` → `ledger.requests`.
-- A table that merely *contains* a similar word is fine: `depot.object_derivatives` stays (it
-  does not begin with `depot_`).
-- Flag every `CREATE TABLE <schema>.<schema>_<rest>`. Enforced everywhere, legacy included
-  (`widget.*`, `ledger.*`, `label.label_counts`, `alert.alert_log` are known debt
-  to rename). **A rename ripples into every SQLx query, `FromRow` struct, and FK reference —
-  treat it as a coordinated migration + code change, never a migration-only edit.**
+- This template's own `example.widgets` is the compliant shape: the schema is `example`, the
+  table is `widgets`, and neither repeats the other.
+- The violation this check flags: `example.example_widgets` (repeats the schema) — the fix is
+  `example.widgets`.
+- A table that merely *contains* a similar word is fine: `example.widget_variants` is not a
+  violation (it does not *begin with* `example_`).
+- Flag every `CREATE TABLE <schema>.<schema>_<rest>`, including on an existing migration that
+  already shipped this way — the fix still applies, it's just heavier. **A rename ripples into
+  every SQLx query, `FromRow` struct, and FK reference — treat it as a coordinated migration +
+  code change, never a migration-only edit.**
 
 **27.3 — Index naming `idx_<table>_<purpose>`.** Indexes are prefixed `idx_`, then the table,
 then the indexed columns/purpose: `idx_photos_scope`, `idx_contacts_user_id`.
@@ -536,8 +537,8 @@ full-width rule comment: `-- ` followed by a run of `=`, e.g.
 
 **How:**
 1. **27.1** — derive the expected schema from the migration's `services/<name>/` path (singular;
-   map the reserved-word `member` → `members`). Grep `CREATE SCHEMA` and `CREATE TABLE <schema>.`;
-   flag any schema that is plural or does not equal the mapped service name.
+   note any deliberate reserved-word rename documented in a comment). Grep `CREATE SCHEMA` and
+   `CREATE TABLE <schema>.`; flag any schema that is plural or does not equal the service name.
 2. **27.2** — for each `CREATE TABLE <schema>.<table>`, flag when `<table>` starts with
    `<schema>_`. Suggested fix = `<schema>.<table-without-schema-prefix>`.
 3. **27.3** — grep `CREATE INDEX [IF NOT EXISTS] <name>`; flag any `<name>` not matching `^idx_`.
@@ -548,11 +549,11 @@ full-width rule comment: `-- ` followed by a run of `=`, e.g.
 
 **Report format:**
 ```
-🔴 [catalog/0002.sql:12] Table `catalogs.catalogs` — schema must be singular `catalog` (matches service dir)
-⚠ [widget/0001.sql:20] Table `widget.widget_members` duplicates schema — rename to `widget.members` (ripples into Rust)
-⚠ [ledger/0003.sql:8]   Index `ledger_uploads_object_idx` — use prefix form `idx_ledger_uploads_object`
-⚠ [member/0001.sql:44]   Trigger `update_members_updated_at` — canonical is `trg_members_updated_at`
-✅ [account/0001.sql:7]  Schema `account` — OK (singular service name)
+🔴 [example/0002.sql:12] Table `examples.examples` — schema must be singular `example` (matches service dir)
+⚠ [example/0003.sql:20] Table `example.example_variants` duplicates schema — rename to `example.variants` (ripples into Rust)
+⚠ [example/0004.sql:8]  Index `widgets_pagination_idx` — use prefix form `idx_widgets_pagination`
+⚠ [example/0005.sql:44] Trigger `update_widgets_updated_at` — canonical is `trg_widgets_updated_at`
+✅ [example/0001.sql:7]  Schema `example` — OK (singular service name)
 ```
 
 **Severity:**

@@ -54,7 +54,7 @@ A count that moves after an upgrade is then a deliberate review rather than a su
 Check #9's matrix, applied to versions. Two repos on different formatter majors will disagree about the same file — most painfully in shared config or copied source.
 
 ```bash
-for r in infra api web; do
+for r in $(ls ~/repos/); do
   ( cd ~/repos/$r 2>/dev/null && printf '%-16s typos=%s\n' "$r" "$(typos --version 2>&1)" )
 done
 ```

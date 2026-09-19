@@ -152,7 +152,7 @@ Axum's default body limit is 2 MiB, which is fine for most JSON endpoints. Flag 
 .allow_credentials(true) // 4xx in browsers, but flags an attempt
 ```
 
-Flag `tower_http::cors::Any` paired with `allow_credentials(true)`, or any `CorsLayer` that allows arbitrary origins on a production service. Compare each service's allowed origins against the canonical list (`PUBLIC_ALLOWED_ORIGINS` = `*.${parent_domain}` in dev *and* prod). Per-service deviations need a written reason in the handler or config doc comment.
+Flag `tower_http::cors::Any` paired with `allow_credentials(true)`, or any `CorsLayer` that allows arbitrary origins on a production service. If this workspace has a canonical allowed-origins list (an env var, a shared config constant), compare each service's `CorsLayer` against it in every environment, not just prod. Per-service deviations need a written reason in the handler or config doc comment.
 
 ### 11. Rate-limit-free authentication / mutation endpoints
 
@@ -194,7 +194,7 @@ For every endpoint receiving a webhook (Stripe, Pub/Sub push, GitHub, Twilio, et
 pub struct Session { user_id: UserId, refresh_token: String }
 ```
 
-For any struct field whose name matches the secret patterns from rule #1, the containing struct must either (a) not derive `Debug`, (b) derive it via `derive_more::Debug` with `#[debug(skip)]` on the secret field, or (c) implement `Debug` manually to redact. The risk: someone logs the struct via `?` formatting and the secret ships to Stackdriver.
+For any struct field whose name matches the secret patterns from rule #1, the containing struct must either (a) not derive `Debug`, (b) derive it via `derive_more::Debug` with `#[debug(skip)]` on the secret field, or (c) implement `Debug` manually to redact. The risk: someone logs the struct via `?` formatting and the secret ships to whatever log sink is downstream — often one that indexes the entry permanently.
 
 ### 15. JWT validator with no revocation-cache subscription
 
@@ -256,9 +256,8 @@ Group by rule (1–15), then by file. For each finding give file:line, the offen
 
 ```
               | secrets | timing | path-trav | redirect | rng | jwt | serde | unsafe | size | cors | webhook | dbg | revoc
-auth          |    1    |   0    |     0     |    1     |  0  |  0  |   0   |   0    |  0   |  0   |    0    |  0  |   0
-widget        |    0    |   0    |     2     |    0     |  0  |  0  |   1   |   0    |  1   |  0   |    0    |  0  |   1
-orders        |    0    |   1    |     0     |    0     |  0  |  0  |   0   |   0    |  0   |  0   |    1    |  0  |   1
+example       |    1    |   0    |     0     |    1     |  0  |  0  |   0   |   0    |  0   |  0   |    0    |  0  |   0
+<other>       |    0    |   0    |     2     |    0     |  0  |  0  |   1   |   0    |  1   |  0   |    0    |  0  |   1
 ```
 
 For rule #11 (rate-limiting) the cell is the *list of unprotected endpoints*, not a count — the user needs the route names to plan the follow-up.

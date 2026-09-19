@@ -4,7 +4,7 @@ Cross-reference each service's `metrics.rs` against its actual boundary function
 
 ## Why
 
-Metrics are the cheapest way to catch a regression: a counter or histogram that doesn't fire for the new code path is a silent failure. The platform pattern is one `metrics.rs` per service that registers every metric the service emits, plus standard names so dashboards and alerts can be written generically.
+Metrics are the cheapest way to catch a regression: a counter or histogram that doesn't fire for the new code path is a silent failure. This workspace's pattern is one `metrics.rs` per service that registers every metric the service emits, plus standard names so dashboards and alerts can be written generically.
 
 ## Conventions (recap)
 
@@ -30,18 +30,18 @@ If a service is missing `metrics.rs` entirely, that's the first finding — fall
 
 ### Step 2: Identify boundary operations that should be measured
 
-For each service, enumerate the operations that warrant metrics. The platform standard is:
+For each service, enumerate the operations that warrant metrics. The general standard is:
 
 | Surface                           | Counter (success)                   | Counter (failure)                          | Histogram                          |
 |-----------------------------------|--------------------------------------|--------------------------------------------|------------------------------------|
-| HTTP handler                      | `{prefix}_request_total{path,method,status}` (often handled by a tower layer in `service-builder`) | — same metric, status label captures failure | `{prefix}_request_duration_seconds` |
+| HTTP handler                      | `{prefix}_request_total{path,method,status}` (often a tower layer, shared across handlers) | — same metric, status label captures failure | `{prefix}_request_duration_seconds` |
 | Service mutation (create/update/delete) | `{prefix}_{operation}_total`   | `{prefix}_{operation}_failed_total{reason}` | `{prefix}_{operation}_duration_seconds` (when latency matters) |
-| External client call (HTTP, gRPC, GCS, Pub/Sub publish) | `{prefix}_{client}_request_total` | `{prefix}_{client}_request_failed_total{reason}` | `{prefix}_{client}_request_duration_seconds` |
-| Pub/Sub subscriber                | `{prefix}_event_received_total{event}` | `{prefix}_event_failed_total{event,reason}` | `{prefix}_event_duration_seconds{event}` |
+| External client call (HTTP, gRPC, object storage, message queue publish) | `{prefix}_{client}_request_total` | `{prefix}_{client}_request_failed_total{reason}` | `{prefix}_{client}_request_duration_seconds` |
+| Message queue subscriber          | `{prefix}_event_received_total{event}` | `{prefix}_event_failed_total{event,reason}` | `{prefix}_event_duration_seconds{event}` |
 | Background job (cleanup, sync)    | `{prefix}_{job}_run_total`           | `{prefix}_{job}_run_failed_total`          | `{prefix}_{job}_duration_seconds` |
 | Cache lookup                      | gauge or counter `{prefix}_cache_hit_total` / `_miss_total` | — | — |
 
-If `service-builder` already provides one of these (e.g. HTTP request metrics via a tower layer), don't duplicate it; instead confirm the layer is wired into the service's router.
+If a shared crate already provides one of these (e.g. HTTP request metrics via a tower layer), don't duplicate it; instead confirm the layer is wired into the service's router. This template has no such shared crate today — each service wires its own metrics directly (see CLAUDE.md).
 
 ### Step 3: Cross-reference
 
@@ -100,4 +100,4 @@ services/example
     - "example_widget_created_total" vs "widget_create_total" elsewhere — pick a canonical form
 ```
 
-End with a workspace summary listing operations missing metrics in 2+ services (likely shared platform gaps worth solving in `service-builder`).
+End with a workspace summary listing operations missing metrics in 2+ services (likely a gap worth solving once, in a shared crate, if the workspace has grown one — see CLAUDE.md's guidance on when a shared crate is warranted).

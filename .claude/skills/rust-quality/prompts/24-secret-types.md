@@ -6,7 +6,7 @@ This is the input/transport-boundary discipline. The output-boundary discipline 
 
 ## Why
 
-The platform encrypts secrets at rest in GCP Secret Manager and mounts them as env vars on Cloud Run. The infra side has classified what's a secret; the Rust side must match that classification in the type system. Today, secrets like `stripe.secret_key`, `tuwunel.{as_token,hs_token}`, OIDC `client_secret`, Anthropic/Gemini/Resend API keys, and HMAC signing secrets are `String`. Every Config that derives `Debug` (and they all do, via `#[derive(Debug, Deserialize, Validate)]`) is one accidental `tracing::debug!(?config)` away from a full-credential leak in Cloud Logging — which indexes the log entry permanently even after rotation.
+Most deployments encrypt secrets at rest (a secrets manager, sealed env vars, a vault) and treat env-injected config as sensitive by the time it reaches the process. The infra side classifies what's a secret; the Rust side must match that classification in the type system, or the classification is theater. A secret-bearing field left as plain `String` — an API key, a signing key, an OIDC `client_secret`, an HMAC secret — makes every `Config` that derives `Debug` (and most do, for ergonomic error messages) one accidental `tracing::debug!(?config)` away from a full-credential leak in whatever log sink is downstream, often one that indexes the entry permanently even after rotation.
 
 `SecretString` makes the type the contract:
 
@@ -32,7 +32,7 @@ Scan all `*.rs` files under `crates/` and `services/`. Specifically:
 2. Every constructor/builder argument flowing from those fields into adapters (`HmacSigner::new(access_id, secret)`, `ResendEmailProvider::new(..., api_key, ...)`, etc.).
 3. Every struct field that *stores* a secret in an adapter (e.g. `pub struct ResendEmailProvider { api_key: String }` after the value left the Config).
 
-Cross-reference against `infra/gcp/environments/{dev,prod}/secrets.tf` — anything declared as a `google_secret_manager_secret` resource is, by definition, a secret. If its Rust mirror is `String`, it's a candidate.
+If this workspace manages secrets via infra-as-code (a Terraform/Pulumi module declaring secret-manager resources, a sealed-secrets manifest, etc.), cross-reference against it — anything declared there as a secret resource is, by definition, a secret. If its Rust mirror is `String`, it's a candidate. Skip this cross-reference if no such infra definition exists in the workspace.
 
 Skip `target/`, `tests/e2e/`, and `*.gen.rs`.
 
@@ -40,16 +40,16 @@ Skip `target/`, `tests/e2e/`, and `*.gen.rs`.
 
 A value is a secret if **any** of these is true:
 
-1. Infra wraps it as a `google_secret_manager_secret` resource.
+1. Infra-as-code (if present) wraps it as a secret-manager resource.
 2. Disclosure enables impersonation (tokens, signing keys, webhook secrets, HMAC secrets).
-3. Disclosure enables billing/quota exhaustion against the platform's account (third-party API keys: Anthropic, Gemini, Resend, Google Maps family, Twilio, Stripe).
+3. Disclosure enables billing/quota exhaustion against the workspace's account with a third-party provider (payment processors, LLM/API providers, messaging providers, map/geocoding providers, etc.).
 4. Disclosure compromises a cryptographic invariant (RSA private keys, JWT signing PEMs, session cookie signing keys, HMAC keys).
 
 A value is **not** a secret if:
 
-- It's a *key identifier* (e.g. `GcsConfig.hmac_access_id`, OIDC `client_id`). Identifiers pair with secrets but aren't independently sensitive.
-- It's a configuration URL (e.g. `tuwunel.homeserver_url`, `resend.base_url`). URLs are public knowledge by deployment.
-- It's a public allowlist (e.g. `public_allowed_origins`, `accepted_audiences`).
+- It's a *key identifier* (e.g. an object-storage client's `hmac_access_id`, OIDC `client_id`). Identifiers pair with secrets but aren't independently sensitive.
+- It's a configuration URL (e.g. a webhook base URL, an upstream service's base URL). URLs are public knowledge by deployment.
+- It's a public allowlist (e.g. `allowed_origins`, `accepted_audiences`).
 - It's an HTTP audience claim or issuer URL (`internal_auth.audience`, `auth.issuer`).
 - It's a flag/boolean derived from a sensitive setting (`billing_enabled`, `allow_dev_tokens`) — the *value* is policy, not a credential.
 
@@ -258,8 +258,8 @@ Doc examples in module-level `//!` blocks and in struct-level `///` blocks must 
 # Plain-String fields whose name suggests a secret
 rg -nE 'pub\s+(secret_key|webhook_secret|signing_key|signing_key_pem|hmac_secret|api_key|client_secret|password|as_token|hs_token|auth_token|private_key):\s*String' --type rust crates/ services/
 
-# Cross-reference with infra
-rg -lnE 'google_secret_manager_secret' ../infra/gcp/environments/*/secrets.tf
+# Cross-reference with infra-as-code, if this workspace has any
+rg -lnE 'secret' infra/ 2>/dev/null
 ```
 
 For each hit, record: file, line, field name, owning struct, and whether the struct currently derives `Clone` / `Serialize`.
@@ -269,8 +269,8 @@ For each hit, record: file, line, field name, owning struct, and whether the str
 The cost of wrapping is roughly:
 
 - **Shared crate (high leverage):** a secret field on a widely-depended-on client or token-issuing crate (e.g. an object-storage client's HMAC secret, an auth crate's signing key). One change cascades to every consumer. Do these first.
-- **High-blast-radius service-local secrets:** Stripe keys, Matrix homeserver tokens, OIDC `client_secret`. Each is one service plus its adapter.
-- **API keys (lower blast radius):** Gemini / Anthropic / Resend / Google Maps family / Turnstile. Mechanical per-service work after the pattern is established.
+- **High-blast-radius service-local secrets:** payment-processor keys, webhook secrets, OIDC `client_secret`. Each is one service plus its adapter.
+- **API keys (lower blast radius):** the rest of the third-party API keys (LLM providers, email/SMS providers, maps/geocoding, captcha, etc.). Mechanical per-service work after the pattern is established.
 
 ### 3. Wrap one struct end-to-end
 
@@ -304,7 +304,7 @@ cargo clippy --workspace --no-deps --all-targets --all-features
 cargo test -p <crate-under-test>
 ```
 
-Per-crate tests should pin the wire contract (the Resend Authorization header test and the GCS HMAC signature test are the model — both pass after the wrap because the signing primitive sees the same bytes).
+Per-crate tests should pin the wire contract (a test asserting the exact `Authorization` header value, or the exact HMAC signature bytes, is the model — it should pass after the wrap unchanged, because the signing primitive sees the same bytes either way).
 
 After verification, grep for any leftover plain-String secret in the same crate:
 
@@ -342,7 +342,7 @@ Group by service / crate. For each:
 - **Secret inventory** — list every field that is now `SecretString` and every field still as `String` (with a one-line note explaining why the latter is *not* a secret, or marking it as a candidate for the next phase).
 - **`.expose_secret()` call-site map** — each entry as `file:line | reason`. Reviewers can audit cleartext windows at a glance.
 - **Clone / Serialize derive deltas** — list every Config struct that lost a derive, with the standardized doc comment present.
-- **Cross-reference with infra** — for each Cloud Run service touched, list `infra/gcp/environments/{dev,prod}/secrets.tf` entries that map to wrapped fields. Anything in the TF that *doesn't* map to a `SecretString` in this commit is a candidate for the next phase.
+- **Cross-reference with infra** — if this workspace has infra-as-code declaring secrets, for each service touched, list the entries that map to wrapped fields. Anything declared there that *doesn't* map to a `SecretString` in this commit is a candidate for the next phase.
 
 End with a one-paragraph note flagging:
 

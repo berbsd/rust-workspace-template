@@ -1,10 +1,10 @@
 # Structured Logging Compliance
 
-Verify all logging follows the platform's structured-logging contract: `tracing` macros with key-value fields (not interpolated strings), `#[tracing::instrument]` on boundary-crossing functions, no secrets in fields, and event constants in the `<type>.<action>.<status>` shape.
+Verify all logging follows this workspace's structured-logging contract: `tracing` macros with key-value fields (not interpolated strings), `#[tracing::instrument]` on boundary-crossing functions, no secrets in fields, and event constants in the `<type>.<action>.<status>` shape.
 
 ## Background
 
-The platform uses `tracing` + `tracing-stackdriver` to emit GCP-compatible JSON. Logs are filtered, queried, and alerted on by structured field — `jsonPayload.event`, `jsonPayload.user_id`, etc. String-interpolated messages (`info!("user {} did {}", id, action)`) defeat that pipeline because the values aren't queryable.
+This workspace uses `tracing`, typically with a JSON-formatting layer (`tracing-subscriber`'s built-in formatter, or a platform-specific one) so a log aggregator can filter, query, and alert on structured fields — `event`, `user_id`, etc. String-interpolated messages (`info!("user {} did {}", id, action)`) defeat that pipeline because the values aren't queryable.
 
 ## What to find
 
@@ -78,7 +78,7 @@ Keep manual logs only for *business events* (payments, auth state transitions, r
 
 ### 5. Event constant format
 
-Where the project uses an `event` field to label structured events, the value must follow the `<type>.<action>.<status>` convention. Examples in the codebase: `service.lifecycle.ready`, `job.process.failed`, `user.sync.success`.
+Where the project uses an `event` field to label structured events, the value must follow the `<type>.<action>.<status>` convention, e.g. `service.lifecycle.ready`, `job.process.failed`, `user.sync.success`.
 
 Flag event values that:
 

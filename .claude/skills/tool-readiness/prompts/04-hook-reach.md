@@ -6,7 +6,7 @@ Find gates that are correctly configured and never run — hooks that were never
 
 A tool can load its rules, apply its config, and fail correctly on a canary, and still never see your commit. Configuration and invocation are separate failures.
 
-Verified in this codebase on 2026-09-09: committing `kb/CANARY-TMP.md` ran `typos` and `betterleaks` but **not** `terraform-validate`, because that command's glob is `*.tf`, `*.tfvars`, `bin/**`, `.github/workflows/*.yml`, `.trivyignore` and a docs path matches none of them. That glob is deliberate and documented — but the same repo's comment records the earlier version of the bug: with a `*.tf`-only glob, *"a commit touching only `bin/` or `.github/` ran NO validation locally — and CI triggers on `pull_request` only, so it ran none there either until a PR was opened."* Two gates, both green, neither executed.
+In this template, committing a docs-only file runs `typos` and `betterleaks` (both globless) but **not** `squawk`, because that command's glob is `*.sql` and a docs path matches nothing there. That's deliberate and correct for `squawk` specifically — but the general failure mode it illustrates is real: a glob scoped to one file type means a commit that never touches that file type runs zero validation for it, locally, and if CI's trigger is similarly scoped (`paths:` filters, `pull_request`-only), it can run none there either until much later than the author expects. Two gates can both report green while neither actually executed.
 
 ## Scope
 
@@ -26,7 +26,7 @@ ls -la .git/hooks/ | grep -v '\.sample'
 grep -l lefthook .git/hooks/* 2>/dev/null || echo "lefthook NOT installed in .git/hooks"
 ```
 
-Fix by making installation part of the repo's setup script (`bin/preflight`, `bin/bootstrap`, a `postinstall`), not a line in a README that a new checkout will skip. Then verify a fresh clone gets them.
+Fix by making installation part of the repo's setup script (`bin/bootstrap`, a `postinstall`), not a line in a README that a new checkout will skip. Then verify a fresh clone gets them.
 
 ### 2. A glob too narrow for the change
 
@@ -74,9 +74,9 @@ Flag any assignment that contradicts these.
 
 ```bash
 # Does a real commit of a docs-only change run what you expect?
-printf 'canary\n' > kb/CANARY-TMP.md && git add kb/CANARY-TMP.md
+printf 'canary\n' > docs/CANARY-TMP.md && git add docs/CANARY-TMP.md
 lefthook run pre-commit 2>&1 | tail -8    # read WHICH commands ran, not just the exit code
-git reset -q HEAD kb/CANARY-TMP.md && rm -f kb/CANARY-TMP.md
+git reset -q HEAD docs/CANARY-TMP.md && rm -f docs/CANARY-TMP.md
 ```
 
 The summary lists each command that executed. A gate you expected and do not see listed did not run — that is the finding. Repeat for each distinct commit shape the repo produces: source-only, config-only, docs-only, deletion-only.
@@ -86,7 +86,7 @@ The summary lists each command that executed. A gate you expected and do not see
 | Gate | Stage | Glob | Ran on docs-only commit? | Ran on source-only? | CI backstop |
 |---|---|---|---|---|---|
 | typos | pre-commit | none | yes | yes | no |
-| terraform-validate | pre-commit | `*.tf`,`bin/**`,… | **no** (by design) | yes | `pull_request` only |
-| betterleaks | pre-commit | none | yes | yes | `secrets.yml` |
+| squawk | pre-commit | `*.sql` | **no** (by design) | yes (if `.sql` staged) | no |
+| betterleaks | pre-commit | none | yes | yes | yes |
 
 Flag every **no** that is not deliberate and documented.

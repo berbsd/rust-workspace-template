@@ -4,7 +4,7 @@ Keep the standard entity actor/audit columns named consistently across `crates/`
 
 ## Why
 
-Every service records who created (and edits/deletes) a row. The platform's north star is that "a developer who knows one service can read any other without relearning anything." When one service calls the creator `created_by`, another `author_id`, and a third `creator_id`, every cross-service read, every relay event, and every SPA mapping pays a translation tax — and a join or serde-rename eventually gets it wrong. The convention is already near-universal in the tree (`widget.created_by`, `order … created_by`, `relay::RelayEvent { created_by }`); a stray synonym is the defect. Clippy cannot see this.
+Every service records who created (and edits/deletes) a row. This workspace's north star is that "a developer who knows one service can read any other without relearning anything." When one service calls the creator `created_by`, another `author_id`, and a third `creator_id`, every cross-service read and every downstream consumer (an event payload, a client DTO, a frontend mapping) pays a translation tax — and a join or serde-rename eventually gets it wrong. `services/example`'s `widget.created_by` establishes the convention; as more services and entities are added, a stray synonym on a new one is the defect. Clippy cannot see this.
 
 ## The convention
 
@@ -16,7 +16,7 @@ An entity's standard actor/audit fields use the **`<verb>_by`** shape, paired wi
 | Who last edited it | **`updated_by`** | `UserId` (often `Option`) |
 | Who soft-deleted it | **`deleted_by`** | `UserId` (`Option`) |
 
-This holds for the **DB column**, the **`FromRow` struct**, the **wire DTO** in the `-client` crate, and the **relay event payload** — they must agree.
+This holds for the **DB column**, the **`FromRow` struct**, and any downstream copy of the field — a wire DTO in a `*-client` crate, an event payload, a frontend type — wherever this workspace has one; they must all agree.
 
 ## Flag
 

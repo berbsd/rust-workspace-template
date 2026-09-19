@@ -10,8 +10,8 @@ Relay events are a **live-refresh channel**: the SPA holds an SSE connection to 
 
 Two failure modes, both invisible to the compiler:
 
-1. **Missing producer (stale UI).** A handler mutates state the SPA renders but never calls `try_publish_relay`. Clients stay stale until TTL/poll/reload. Worse in multi-scope services (notes, orders): one scope arm emits, another silently doesn't.
-2. **Dead variant (contract rot).** A `*RelayEvent` variant is defined (and often *consumed* by the relay ingest layer) but no service ever publishes it. The consumer is wired for an event that never arrives — the feature looks done end-to-end but the nudge never fires. `WidgetRelayEvent::WidgetCreated` is the canonical example: defined, handled by the relay/notifications service's ingest feature, but `create_widget` publishes nothing, so it has zero producers.
+1. **Missing producer (stale UI).** A handler mutates state the SPA renders but never calls `try_publish_relay`. Clients stay stale until TTL/poll/reload. Worse in multi-scope services: one scope arm emits, another silently doesn't.
+2. **Dead variant (contract rot).** A `*RelayEvent` variant is defined (and often *consumed* by the relay ingest layer) but no service ever publishes it. The consumer is wired for an event that never arrives — the feature looks done end-to-end but the nudge never fires. For example, if a `WidgetRelayEvent::WidgetCreated` variant were defined and handled by the relay/notifications service's ingest feature, but the `create_widget` operation published nothing, that variant would have zero producers — a dead event that looks wired but never fires.
 
 Relay is intentionally **best-effort** (`try_publish_relay` logs and swallows publish errors) and fires **after** the durable outbox commit — the outbox is the source of truth, the relay nudge is the live poke. That design makes a missing nudge easy to overlook precisely because nothing else breaks.
 
@@ -102,18 +102,18 @@ grep -rn "<VariantName>" services hosts jobs crates --include=*.rs | grep -v 'se
 
 ## Report format
 
-Per-service block:
+Per-service block (illustrative — substitute this workspace's actual service/variant names):
 
 ```
-services/example   (publisher wired: yes — AppState.relay_publisher)
+services/<name>   (publisher wired: yes — AppState.relay_publisher)
   Variant coverage:
-    widget.updated             → COVERED  services/example/.../widget/service.rs:99 (update_widget)
-    widget.member_joined       → COVERED  services/example/.../widget_member/service.rs:215 (add_member)
-    widget.created              → GAP      no producer — create_widget (service.rs:24) publishes nothing;
-                                          consumed at services/relay/src/feature/ingest/service.rs:382
+    <resource>.updated          → COVERED  services/<name>/.../service.rs:99 (update_<resource>)
+    <resource>.member_joined    → COVERED  services/<name>/.../service.rs:215 (add_member)
+    <resource>.created          → GAP      no producer — create_<resource> (service.rs:24) publishes nothing;
+                                          consumed at services/<relay-service>/.../ingest/service.rs:NN
   Operation coverage:
-    create_widget (service.rs:24)   → MISSING widget.created nudge  (creator's own screen + any admin list stay stale)
-    update_widget (service.rs:80)   → OK
+    create_<resource> (service.rs:24)   → MISSING <resource>.created nudge  (creator's own screen + any admin list stay stale)
+    update_<resource> (service.rs:80)   → OK
   Multi-scope / lifecycle: n/a
 ```
 

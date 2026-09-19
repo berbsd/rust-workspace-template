@@ -6,22 +6,22 @@ Make the failure path fast. Find hook suites where a check that fails in millise
 
 `parallel` and `piped` optimise opposite cases. Parallel minimises the **pass** path; piped-with-priority minimises the **fail** path. When one command dominates the runtime, parallelism has nothing left to win and early exit has everything.
 
-Measured in `infra` on 2026-09-09:
+A worked example of the shape this takes once one command dominates (numbers below are illustrative, not measured — replace with this repo's own once check #1's per-command timings exist):
 
 | Command | Time |
 |---|---|
 | `typos` | 0.02s |
 | `betterleaks` | 0.17s |
-| `bin/validate` | 36.16s |
+| a slow whole-project check | 36.16s |
 
-Sequential total 36.35s, parallel 36.16s — **0.19s saved, 0.5%**, inside `bin/validate`'s own run-to-run variance. Then the same staged typo, timed both ways:
+Sequential total 36.35s, parallel 36.16s — **0.19s saved, 0.5%**, inside the slow check's own run-to-run variance. Then the same staged typo, timed both ways:
 
 | Mode | Failure path | Happy path |
 |---|---|---|
-| `parallel: true` | **34.37s** — `typos` failed at 0.01s, validate ran to completion anyway | ~36.2s |
+| `parallel: true` | **34.37s** — `typos` failed at 0.01s, the slow check ran to completion anyway | ~36.2s |
 | `piped: true` + `priority` | **0.06s** — stopped at typos | 35.95s |
 
-Same defect, **570× difference**, with no measurable cost to the pass path. The slow path is the one developers experience repeatedly while fixing something.
+Same defect, **570× difference**, with no measurable cost to the pass path. The slow path is the one developers experience repeatedly while fixing something. Run this repo's own version of the measurement — this template's current `pre-commit` commands (typos, betterleaks, rustfmt, squawk) are all fast, so this particular gap may not exist yet, but re-check it any time a slow whole-project command gets added to a hook stage.
 
 ## Scope
 
@@ -44,7 +44,7 @@ If the longest command is more than ~10× the sum of the rest, parallelism is bu
 
 ### 2. Alphabetical ordering by default
 
-**Lefthook orders commands alphabetically unless `priority:` is set.** This is the trap: `betterleaks, terraform-validate, typos` puts the 36s command *second* and the 0.02s command last. Piped mode without explicit priorities can be slower on the failure path than parallel.
+**Lefthook orders commands alphabetically unless `priority:` is set.** This is the trap: `betterleaks, slow-check, typos` puts a 36s command *second* and the 0.02s command last, purely because of alphabetical sort. Piped mode without explicit priorities can be slower on the failure path than parallel.
 
 ```yaml
 pre-commit:
@@ -54,7 +54,7 @@ pre-commit:
       priority: 1        # 0.02s
     betterleaks:
       priority: 2        # 0.17s
-    terraform-validate:
+    slow-check:
       priority: 3        # 36s
 ```
 
@@ -62,7 +62,7 @@ Order by measured cost ascending, subject to check #8's mutation constraints.
 
 ### 3. A slow whole-project check in `pre-commit`
 
-If a check does not depend on what was staged, it belongs in `pre-push`. `web` splits on exactly this line — pre-commit stays in the ~10s range on staged files; typecheck, full test suite and production build run once per push.
+If a check does not depend on what was staged, it belongs in `pre-push`. A repo with a real split usually looks like this: `pre-commit` stays fast on staged files only, while a full type-check, the whole test suite, or a production build run once per push instead.
 
 ### 4. Measuring the happy path only
 

@@ -18,7 +18,7 @@ A `require_*` function is a **guard**: it enforces one precondition and, on fail
 
 Additional rules:
 
-- **Placement.** Guards shared across features live in `service/checks.rs` / `service/membership.rs`; a guard used by exactly one feature may live in that feature's `service.rs`. Shared inner logic behind two related guards is factored into one `_inner` helper (as `require_note_access` / `require_deleted_note_access` / `require_note_access_inner` do) — not copy-pasted.
+- **Placement.** Guards shared across features live in `service/checks.rs` / `service/membership.rs`; a guard used by exactly one feature may live in that feature's `service.rs`. Shared inner logic behind two related guards is factored into one `_inner` helper (e.g. `require_widget_access` / `require_deleted_widget_access` sharing a `require_widget_access_inner`) — not copy-pasted.
 - **Naming means "error if not."** `require_*` implies a fallible guard. A boolean predicate must not be named `require_*` (use `is_*` / `can_*` / `has_*`); a fallible guard must not be named like a predicate.
 - **Deviations from `Result<(), _>` are documented.** Any `require_*` returning `Result<T, _>` (T ≠ `()`) carries a rustdoc line stating *what* it returns and *why unit will not do* — which downstream consumer needs the value, or which token it mints. The typed-proof and extractor rows above are legitimate and common; the **undocumented** non-unit return is the defect, not the non-unit return itself.
 
@@ -31,9 +31,9 @@ Additional rules:
 
 ## Do NOT flag
 
-- **Same-named guards in *different* services** (`require_widget_membership` in `example` vs `orders`) — each service owns its own; that is not duplication.
+- **Same-named guards in *different* services** (`require_widget_membership` in `example` vs an equivalently-shaped guard in another service) — each service owns its own; that is not duplication.
 - **Documented typed-proof / extractor returns** (`Result<Membership, _>`, `Result<UserId, _>` with a rustdoc reason) — these are the sanctioned blueprint pattern, not deviations to "fix" back to `Result<(), _>`.
-- **Distinct preconditions that merely look alike** (`require_note_access` vs `require_deleted_note_access`) — different guards for different states, provided their shared logic is factored rather than copy-pasted.
+- **Distinct preconditions that merely look alike** (`require_widget_access` vs `require_deleted_widget_access`) — different guards for different states, provided their shared logic is factored rather than copy-pasted.
 - **Test functions** named `require_*` (e.g. `require_owner_returns_forbidden`) — they exercise a guard, they are not guards.
 
 ## Report

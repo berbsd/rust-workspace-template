@@ -24,15 +24,13 @@ pre-commit:
   # would race on the file contents and on .git/index.lock.
   #
   # piped also stops at the first failure, which parallel and plain sequential
-  # do not. Measured 2026-09-09 with a typo staged in a .rs file: 3.12s, because
-  # `audits` (2.82s) sorts FIRST alphabetically and `typos` (0.03s) sorts last.
-  # The same defect now costs ~0.05s.
+  # do not, so ordering matters: a slow check placed first wastes time on
+  # every commit that would have failed a cheap check anyway.
   #
-  # priority is mandatory with piped: lefthook orders alphabetically otherwise,
-  # which is how the 0.03s check ended up behind the 2.82s one. Ordered by
-  # measured cost ascending:
-  #   typos 0.03 · betterleaks 0.09 · rustfmt 0.12 · squawk · audits 2.82
-  # `audits` stays after `rustfmt` so it inspects formatted code.
+  # priority is mandatory with piped: lefthook orders alphabetically
+  # otherwise, which can put an expensive check ahead of a cheap one for no
+  # reason. Ordered by cost, cheapest first: typos, betterleaks, rustfmt,
+  # squawk.
   piped: true
   commands:
     betterleaks:
@@ -59,7 +57,8 @@ pre-commit:
       # `cargo fmt` takes no file scope: it reformats every dirty `.rs` file in
       # the tree, and `stage_fixed` then adds them all — so a commit touching
       # one file could absorb another session's uncommitted Rust work, with a
-      # message describing none of it. That happened in 7ac7d0c0.
+      # message describing none of it — exactly what staged-file scoping
+      # avoids.
       #
       # Edition is passed explicitly because rustfmt invoked directly gets no
       # Cargo manifest to read it from and would otherwise assume 2015.
