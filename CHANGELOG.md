@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.5] - 2026-09-21
+
+### Bug Fixes
+
+- Drop the example package from nextest's DB test-group override
+
 ## [0.1.4] - 2026-09-19
 
 ### Miscellaneous
