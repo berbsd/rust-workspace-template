@@ -155,6 +155,12 @@ check_bootstrap_deps() {
       fail "clippy component"
       info "run: rustup component add clippy"
     fi
+    if rustup component list --installed 2>/dev/null | grep -q '^rust-analyzer'; then
+      ok "rust-analyzer component"
+    else
+      fail "rust-analyzer component"
+      info "run: rustup component add rust-analyzer"
+    fi
     if rustup toolchain list 2>/dev/null | grep -q '^nightly'; then
       ok "nightly toolchain"
     else

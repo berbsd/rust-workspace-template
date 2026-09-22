@@ -27,7 +27,7 @@
 #
 #   Rust Toolchain:
 #   - Nightly toolchain (for rustfmt unstable features)
-#   - rustfmt, clippy components
+#   - rustfmt, clippy, rust-analyzer components
 #
 #   Cargo Tools:
 #   - cargo-nextest (fast test runner)
@@ -276,7 +276,7 @@ setup_rust_toolchain() {
   rustup update
 
   rustup toolchain install nightly
-  rustup component add rustfmt clippy
+  rustup component add rustfmt clippy rust-analyzer
 
   ok "rust toolchain"
 }
