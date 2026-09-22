@@ -23,13 +23,32 @@ exclude = [".claude/skills/create-rust-service/**", ".cliff.toml"]
 # The repo's own README documents the template for GitHub browsers, not the
 # generated project — dropped here, then hooks/post.rhai renames
 # README.project.md into its place.
-ignore = ["README.md"]
+#
+# .worktrees/** is this repo's own local git-worktree directory (gitignored,
+# never present in a real `--git` clone) — ignored so `cargo generate --path`
+# against a live checkout that happens to have one doesn't walk into
+# unrelated in-progress work and choke on whatever Liquid-unfriendly content
+# it contains. Purely a `--path`/local-testing concern; harmless otherwise.
+ignore = ["README.md", ".worktrees/**"]
 
 [placeholders]
 PROJECT_NAME = { type = "string", prompt = "Project display name (e.g. \"Acme Platform\")" }
 AUTHOR_NAME = { type = "string", prompt = "Author name" }
 AUTHOR_EMAIL = { type = "string", prompt = "Author email", regex = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$" }
-LICENSE = { type = "string", prompt = "License (e.g. \"MIT\", \"Apache-2.0\", \"UNLICENSED\")" }
+# A single SPDX id ("MIT", "AGPL-3.0", ...) or an "A OR B" dual/multi
+# expression ("MIT OR Apache-2.0"). hooks/post.rhai fetches each part's real
+# license text from GitHub's Licenses API (github.com/licenses — the same
+# source GitHub's own "choose a license" UI uses) rather than this template
+# bundling every possible SPDX license text itself, which wouldn't scale
+# and would go stale if any text were ever corrected upstream. Any id
+# GitHub's API doesn't recognize — including "UNLICENSED", npm's proprietary
+# marker, which isn't a real SPDX id — drops the LICENSE file for that part
+# rather than ship one that contradicts this value, printing a note instead
+# of failing generation. The regex only guards against shell-metacharacter
+# injection (this value flows into a shell command in the hook); it isn't
+# an enum, so any real or made-up SPDX-shaped id is accepted here and
+# handled at fetch time.
+LICENSE = { type = "string", prompt = "License (e.g. \"MIT\", \"Apache-2.0\", \"AGPL-3.0\", \"MIT OR Apache-2.0\", \"UNLICENSED\")", regex = "^[A-Za-z0-9.-]+( OR [A-Za-z0-9.-]+)*$" }
 REPO_URL = { type = "string", prompt = "Repository URL" }
 METRIC_NAMESPACE = { type = "string", prompt = "Metrics namespace" }
 # Strictly X.Y.Z: a floating channel (`stable`/`nightly`) would defeat the

@@ -56,3 +56,65 @@ if keep_example == false {
 // documents the template itself, not a generated project). Move the real
 // generated-project README into its place.
 file::rename("README.project.md", "README.md");
+
+// LICENSE (this repo's own real Apache-2.0 text — dogfoodable, GitHub reads
+// it directly, so it's never templated) always gets replaced: license text
+// is fetched fresh per generation from GitHub's Licenses API instead of
+// bundling every possible SPDX license here, which wouldn't scale and would
+// go stale if any text were ever corrected upstream. LICENSE is deleted
+// unconditionally first so a dual/multi expression or an unrecognized id
+// never leaves this repo's own Apache-2.0 text behind by accident.
+//
+// LICENSE is regex-validated (see cargo-generate.toml) to only the
+// characters a shell command can safely receive unquoted — never build a
+// command this way from an unvalidated free-text placeholder (AUTHOR_NAME,
+// by contrast, only ever reaches Rhai's native string::replace below, never
+// a shell command, specifically so it can safely contain anything,
+// including quotes).
+file::delete("LICENSE");
+let license = variable::get("LICENSE");
+let author = variable::get("AUTHOR_NAME");
+let year = system::date().year.to_string();
+
+let raw_parts = license.split(" OR ");
+let parts = [];
+for p in raw_parts {
+    let part = p;
+    part.trim();
+    parts.push(part);
+}
+let multi = parts.len() > 1;
+
+for part in parts {
+    // A single license becomes plain LICENSE; "MIT OR Apache-2.0" becomes
+    // LICENSE-MIT + LICENSE-Apache-2.0 (Rust's own dual-license convention).
+    let target = if multi { "LICENSE-" + part } else { "LICENSE" };
+    let tmp = target + ".fetching";
+    // GitHub's Licenses API is case-insensitive on the key and covers the
+    // common OSS licenses (MIT, Apache-2.0, the GPL/AGPL/LGPL family,
+    // MPL-2.0, BSD-2/3-Clause, Unlicense, ...), not the full SPDX list.
+    // mv only runs if the fetch succeeded; otherwise the tmp file (which
+    // may hold a JSON error body, not the license text) is discarded and
+    // no `target` is created at all.
+    system::command("gh", [
+        "api", "licenses/" + part, "--jq", ".body",
+        ">", tmp, "2>", "/dev/null",
+        "&&", "mv", tmp, target,
+        "||", "rm", "-f", tmp
+    ]);
+    if file::exists(target) {
+        // GitHub's license bodies use [year]/[fullname] as fill-in markers
+        // (MIT/BSD-style licenses only — Apache/GPL-family bodies have no
+        // such placeholder, so this is a harmless no-op for those). Rhai's
+        // string::replace mutates in place and returns unit, not a new
+        // string — call it as a statement, never chained or assigned.
+        let body = system::command("cat", [target]);
+        body.replace("[year]", year);
+        body.replace("[fullname]", author);
+        file::write(target, body);
+    } else {
+        print("note: rust-workspace-template couldn't find a license text for '"
+            + part + "' via GitHub's license list — no " + target
+            + " written. Add one by hand if you need it.");
+    }
+}
