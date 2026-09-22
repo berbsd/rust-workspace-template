@@ -1,0 +1,46 @@
+# =============================================================================
+# cargo-generate template configuration
+# =============================================================================
+# Declares the values a new workspace needs and how generation adapts to
+# them. create-rust-workspace's scaffold wrapper collects these from the user
+# and passes them non-interactively via `cargo generate --silent -d KEY=value`.
+#
+# Placeholder names deliberately match the SCREAMING_SNAKE_CASE tokens this
+# template's files already use (e.g. {{PROJECT_NAME}}) — cargo-generate's
+# Liquid substitution has no lowercase/snake_case requirement, so keeping the
+# existing names avoids a repo-wide rename.
+# =============================================================================
+
+[template]
+# These use their own, unrelated `{{...}}` template syntax (create-rust-service
+# substitutes feature-name tokens when scaffolding a service *after* this
+# workspace already exists; git-cliff's .cliff.toml uses Tera). `exclude`
+# copies them verbatim instead of running them through Liquid — several of
+# create-rust-service's prompt files fail to parse as Liquid outright, and
+# the rest would silently render blank on every `{{feature_plural}}`-style
+# token, since those aren't declared placeholders here.
+exclude = [".claude/skills/create-rust-service/**", ".cliff.toml"]
+# The repo's own README documents the template for GitHub browsers, not the
+# generated project — dropped here, then hooks/post.rhai renames
+# README.project.md into its place.
+ignore = ["README.md"]
+
+[placeholders]
+PROJECT_NAME = { type = "string", prompt = "Project display name (e.g. \"Acme Platform\")" }
+AUTHOR_NAME = { type = "string", prompt = "Author name" }
+AUTHOR_EMAIL = { type = "string", prompt = "Author email", regex = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$" }
+LICENSE = { type = "string", prompt = "License (e.g. \"MIT\", \"Apache-2.0\", \"UNLICENSED\")" }
+REPO_URL = { type = "string", prompt = "Repository URL" }
+METRIC_NAMESPACE = { type = "string", prompt = "Metrics namespace" }
+# Strictly X.Y.Z: a floating channel (`stable`/`nightly`) would defeat the
+# reproducibility rust-toolchain.toml exists for — see that file's own header
+# comment. This regex enforces the same rule scaffold.sh used to enforce in
+# the wrapper script; now it's enforced at generation time instead.
+RUST_VERSION = { type = "string", prompt = "Rust toolchain version (X.Y.Z)", regex = "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+keep_example = { type = "bool", prompt = "Keep the bundled example service (services/example + hosts/example-host)?", default = true }
+
+[conditional.'keep_example == false']
+ignore = ["services/example/**", "hosts/example-host/**"]
+
+[hooks]
+post = ["hooks/post.rhai"]
