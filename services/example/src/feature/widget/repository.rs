@@ -4,7 +4,7 @@
 //! so a handler depends on the shape of storage, not on Postgres — the
 //! seam that would let a unit test substitute an in-memory fake. This
 //! template's own tests don't take that route: per the workspace
-//! `CLAUDE.md`, a real throwaway database (`#[sqlx::test]`) is preferred
+//! `AGENTS.md`, a real throwaway database (`#[sqlx::test]`) is preferred
 //! over mocking storage, so `tests/widget_it.rs` drives
 //! [`PgWidgetRepository`] directly through the real router. Keep the trait
 //! anyway — it costs nothing today and is exactly what a future test that

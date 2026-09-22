@@ -33,7 +33,7 @@ The `rust-quality` skill includes checks that complement documentation: Invarian
 
 1. **Comment the WHY, not the WHAT** — rationale, tradeoffs, constraints
 2. **Document at the right layer** — crate → module → item → implementation
-3. **Every function gets a doc comment** — `pub`, `pub(crate)`, *and* private (CLAUDE.md "Rustdoc on every function"). Trivial accessors and documented trait-impl methods are the only exemption
+3. **Every function gets a doc comment** — `pub`, `pub(crate)`, *and* private (AGENTS.md "Rustdoc on every function"). Trivial accessors and documented trait-impl methods are the only exemption
 4. **Use standard sections** — `# Examples`, `# Errors`, `# Panics`, `# Safety`
 5. **Leverage the type system** — don't repeat what signatures already say
 6. **Remove redundant comments** — a comment restating code is noise
@@ -199,7 +199,7 @@ Modules with more than one or two items get `//!` docs describing:
 
 **Every** `pub` item gets a `///` doc comment. This is not optional. The doc comment must include:
 
-> **This workspace goes further than upstream Rust convention.** CLAUDE.md requires a `///`
+> **This workspace goes further than upstream Rust convention.** AGENTS.md requires a `///`
 > summary on `pub`, `pub(crate)`, **and private** functions alike — a private helper is still
 > read by the next maintainer, and a one-line summary is cheap. Treat an
 > undocumented private fn as a defect, not a style preference. Trivial accessors and
@@ -581,7 +581,7 @@ pub struct Foo;
 Before completing documentation, verify:
 
 - [ ] Every `pub fn`, `pub struct`, `pub enum`, `pub trait`, `pub type`, `pub const`, `pub static`, and `pub macro` has a `///` doc comment
-- [ ] Every `pub(crate)` and **private** `fn` has at least a `///` summary line (CLAUDE.md rule)
+- [ ] Every `pub(crate)` and **private** `fn` has at least a `///` summary line (AGENTS.md rule)
 - [ ] Every function returning `Result` has `# Errors` listing each variant
 - [ ] Every function that can panic has `# Panics`
 - [ ] Every `unsafe fn` has `# Safety`

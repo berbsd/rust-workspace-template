@@ -55,7 +55,7 @@ filled in when a new project is generated from it.
 - No auth. `services/example` has no bearer-token or session layer — every route is
   public. Add whatever auth your project needs; there's no framework assumption to work
   around.
-- `jobs/` and `workers/` directories — created on demand; see `CLAUDE.md`.
+- `jobs/` and `workers/` directories — created on demand; see `AGENTS.md`.
 
 ## Getting started
 
@@ -66,7 +66,7 @@ just check            # format check, clippy, tests, typos, cargo-deny
 just run example       # run the example service locally
 ```
 
-See `CLAUDE.md` for the working rules and workspace conventions this template enforces.
+See `AGENTS.md` for the working rules and workspace conventions this template enforces.
 
 ## License
 

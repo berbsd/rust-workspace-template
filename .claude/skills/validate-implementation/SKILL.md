@@ -130,7 +130,7 @@ If Step 1 flagged **any** new or modified Rust item, invoke `rust-documenter`:
 Skill(skill="rust-documenter", args="audit doc coverage on current branch")
 ```
 
-Its contract for this workspace (CLAUDE.md "Rustdoc on every function"): every `pub`,
+Its contract for this workspace (AGENTS.md "Rustdoc on every function"): every `pub`,
 `pub(crate)`, **and private** function carries a `///` summary; `# Errors` on every
 `Result`-returning fn; `# Panics`/`# Safety` where they apply. Trivial accessors and
 documented trait-impl methods are the only exemption. Spot-check the diff:

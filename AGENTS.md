@@ -1,4 +1,4 @@
-# {{PROJECT_NAME}} — Claude Code Guide
+# {{PROJECT_NAME}} — Agent Guide
 
 Rust 2024 microservices workspace. This file is the top-level contract for
 working in this repo — read it before making changes, and keep it accurate as the shape

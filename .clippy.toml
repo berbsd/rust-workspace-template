@@ -21,7 +21,7 @@ cognitive-complexity-threshold = 25
 
 # Calls that are always the wrong choice here, with the right one named in the
 # error. This is where a "never call X" rule belongs once it exists — prose in
-# CLAUDE.md is enforced by whoever happens to read it, this is enforced by the
+# AGENTS.md is enforced by whoever happens to read it, this is enforced by the
 # compiler, and the `reason`/`replacement` fields put the argument in front of
 # whoever hits it rather than in a document they have to go find.
 #
