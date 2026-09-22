@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.6] - 2026-09-22
+
+### Bug Fixes
+
+- Correct rust-quality skill's stale menu and false claims
+
+### Documentation
+
+- Cover testing commands in the generated project's README
+
+### Features
+
+- **quality:** Mechanize checks #33 and #17 via ast-grep and dylint
+- **skills:** Add create-rust-service scaffolding skill
+- Generate via cargo-generate instead of scaffold.sh's sed pipeline
+- Fetch license text per generation, not one bundled copy
+- Install rust-analyzer as part of the bootstrapped toolchain
+
+### Miscellaneous
+
+- Bump squawk's target Postgres version to 18
+- Rename CLAUDE.md to AGENTS.md
+- Ignore local git worktrees
+- Merge cargo-generate-migration into main
+
 ## [0.1.5] - 2026-09-21
 
 ### Bug Fixes
