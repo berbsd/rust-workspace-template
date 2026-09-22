@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-09-22
+
+### Bug Fixes
+
+- Point bin/doctor at .lefthook.yml after the rename
+
 ## [0.2.0] - 2026-09-22
 
 ### Bug Fixes
