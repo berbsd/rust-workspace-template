@@ -1,17 +1,7 @@
-# rust-workspace-template
+# {{PROJECT_NAME}}
 
-Rust 2024 microservices workspace template: a `justfile`-driven, lint-heavy,
-feature-first-service starter, extracted from a production platform and stripped down to
-its generic bones — no shared service framework, no product-specific code, just the
-tooling and one real, working example.
-
-Most files here (`Cargo.toml`, `AGENTS.md`, …) are themselves templates — the `{{...}}`
-placeholders throughout get filled in by
-[`cargo generate`](https://github.com/cargo-generate/cargo-generate) when a new project
-is generated from this repo (see `cargo-generate.toml`). This README is the one
-exception: it documents the template itself for people browsing this repo, and is
-swapped out for `README.project.md` — written for the generated project, not for this
-one — during generation (see `hooks/post.rhai`).
+Rust 2024 microservices workspace: a `justfile`-driven, lint-heavy, feature-first-service
+setup generated from [rust-workspace-template](https://github.com/berbsd/rust-workspace-template).
 
 ## What's here
 
@@ -20,6 +10,7 @@ one — during generation (see `hooks/post.rhai`).
   (`PaginatedResponse`, `Cursor`, `KeysetCursor`). Deliberately minimal — no auth types, no
   typed ids, no validation framework. Add to it only once two services genuinely need the
   same code.
+{% if keep_example -%}
 - **`services/example/`** — a real, self-contained CRUD service (`feature/widget`) built
   directly on `axum`/`sqlx`/`tokio` — no shared bootstrap or middleware framework to depend
   on. `main.rs` → `lib.rs`'s `router(pool)` → `feature/widget/{model,handler,repository,error}.rs`
@@ -32,18 +23,22 @@ one — during generation (see `hooks/post.rhai`).
 - **`hosts/example-host/`** — a binary that nests `example::router(pool)` under a path
   prefix, demonstrating how multiple services would compose into one deployable process to
   save on always-warm compute cost. Every service also stands alone — a host is optional.
+{% else -%}
+- **`services/`** / **`hosts/`** — empty until you add a first service or host with the
+  `create-rust-service` skill; see `AGENTS.md` for the conventions each one follows.
+{% endif -%}
 - **`.claude/skills/`** — engineering-discipline skills: `create-rust-service`
   (scaffolds a new service or feature slice), `rust-quality` (including handler hygiene,
   check #34), `rust-documenter` (rustdoc, and OpenAPI/utoipa/Scalar annotations if the
   service adds them — see its `references/openapi-annotations.md`),
   `rust-tracing-instrument`, `sql-analyzer`, `tool-readiness`, `validate-implementation`.
-  Some `rust-quality` checks describe patterns this template doesn't have yet (an outbox,
+  Some `rust-quality` checks describe patterns this workspace doesn't have yet (an outbox,
   a JWT revocation cache) — skip those until the workspace grows them.
 - **`.mcp.json`** — registers the [Context7](https://context7.com) MCP server, so Claude
   Code (or any other MCP-compatible client) gets live, version-accurate library/framework
   documentation lookups natively, without shelling out to a CLI. Works unauthenticated out
   of the box, at lower rate limits; `export CONTEXT7_API_KEY=<key>` before launching your
-  client for higher limits. Claude Code prompts for approval the first time a project's
+  client for higher limits. Claude Code prompts for approval the first time this project's
   `.mcp.json` loads — decline it if you'd rather not use it.
 - **Tooling**: `justfile` (`just check`/`fmt`/`test`/`db-ensure`/…), `lefthook.yml`
   (pre-commit secret scan, formatting, conventional commits — subject/body capped at 72
@@ -54,17 +49,14 @@ one — during generation (see `hooks/post.rhai`).
 
 ## Not included
 
-- **No shared service framework.** The source platform this template was extracted from
-  has one — a `service-builder`-style crate providing auth/admin/idempotency middleware,
-  telemetry, health probes, and a typed-id/JWT/outbox ecosystem around it. Porting that
-  whole framework is a bigger, separate undertaking than a starter template needs; this
-  template gives you the shape (`main` → `router(pool)` → `feature/`) and lets you add
-  shared infrastructure as your own services actually need it.
+- **No shared service framework.** Every service is `main` → `router(pool)` → `feature/`,
+  built directly on `axum`/`sqlx`/`tokio`. Add shared infrastructure as your services
+  actually need it rather than adopting one up front.
 - `bin/deploy` / `bin/deploy_all` are stubs — deploy mechanics are specific to your
   infrastructure. Fill them in once you have a target.
-- No auth. `services/example` has no bearer-token or session layer — every route is
-  public. Add whatever auth your project needs; there's no framework assumption to work
-  around.
+- No auth.{% if keep_example %} `services/example` has no bearer-token or session layer —
+  every route is public.{% endif %} Add whatever auth this project needs; there's no
+  framework assumption to work around.
 - `jobs/` and `workers/` directories — created on demand; see `AGENTS.md`.
 
 ## Getting started
@@ -73,14 +65,13 @@ one — during generation (see `hooks/post.rhai`).
 ./bin/bootstrap       # installs rustup toolchain, just, lefthook, taplo, typos, etc.
 ./bin/doctor          # confirms everything installed cleanly and is up to date
 just check            # format check, clippy, tests, typos, cargo-deny
+{% if keep_example -%}
 just run example       # run the example service locally
+{% endif -%}
 ```
 
-See `AGENTS.md` for the working rules and workspace conventions this template enforces.
+See `AGENTS.md` for the working rules and workspace conventions this project follows.
 
 ## License
 
-Licensed under the Apache License, Version 2.0 (the "License"); see [LICENSE](LICENSE).
-This covers the template's own content (scaffolding, skills, example code). A project
-generated from this template picks its own license when scaffolded — see the `license`
-field in its `Cargo.toml`.
+Licensed under {{LICENSE}}; see [LICENSE](LICENSE).
