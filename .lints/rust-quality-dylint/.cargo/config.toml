@@ -1,5 +1,0 @@
-# dylint lints must link with its own driver rather than the system linker.
-# Required for every crate in this sub-workspace; see `dylint`'s own
-# scaffolding (`cargo dylint new`) for why this is the standard shape.
-[target.'cfg(all())']
-rustflags = ["-C", "linker=dylint-link"]

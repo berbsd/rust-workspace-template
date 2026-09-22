@@ -19,14 +19,6 @@
 
 set -u
 
-# ast-grep/cargo-dylint/dylint-link install project-local (./.cargo/bin, via
-# bin/bootstrap), not to ~/.cargo/bin. .envrc adds this to PATH for an
-# interactive direnv-hooked shell, but this script should report correctly
-# even invoked without direnv active (a plain `./bin/doctor`, a CI step, a
-# non-interactive shell) — so add it here too rather than assuming.
-DOCTOR_REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PATH="$DOCTOR_REPO_ROOT/.cargo/bin:$PATH"
-
 VERBOSE=0
 [[ "${1:-}" == "--verbose" || "${1:-}" == "-v" ]] && VERBOSE=1
 
@@ -125,7 +117,6 @@ check_bootstrap_deps() {
   report_tool direnv optional
   report_tool taplo required
   report_tool typos required
-  report_tool ast-grep required
   report_tool git-cliff required
   report_tool lefthook required
   report_tool betterleaks required
@@ -181,37 +172,6 @@ check_bootstrap_deps() {
         info "not installed yet — the next cargo command in this workspace will auto-install it"
       fi
     fi
-
-    # .lints/rust-quality-dylint/ pins a *different* nightly (dylint's lints
-    # need rustc_private, which the root toolchain above doesn't expose — see
-    # .lints/rust-quality-dylint/README.md). Checked separately, including its
-    # specific components, since "toolchain installed" isn't the same as
-    # "toolchain has rustc-dev" — the gap that made `cargo dylint` fail with
-    # `can't find crate for rustc_driver` the first time this was set up.
-    local dylint_toolchain_file
-    dylint_toolchain_file="$(dirname "$0")/../.lints/rust-quality-dylint/rust-toolchain.toml"
-    if [[ -f "$dylint_toolchain_file" ]]; then
-      local dylint_pinned
-      dylint_pinned=$(grep -E '^channel' "$dylint_toolchain_file" | sed -E 's/.*"([^"]+)".*/\1/')
-      if rustup toolchain list 2>/dev/null | grep -q "^${dylint_pinned}"; then
-        local dylint_components dylint_component missing_component=0
-        dylint_components=$(rustup component list --toolchain "$dylint_pinned" --installed 2>/dev/null)
-        for dylint_component in rustc-dev rust-src llvm-tools; do
-          if ! echo "$dylint_components" | grep -q "^${dylint_component}"; then
-            missing_component=1
-          fi
-        done
-        if [[ "$missing_component" -eq 0 ]]; then
-          ok "dylint toolchain ($dylint_pinned, rustc-dev/rust-src/llvm-tools)"
-        else
-          fail "dylint toolchain components ($dylint_pinned)"
-          info "run: rustup toolchain install $dylint_pinned --component rustc-dev --component rust-src --component llvm-tools-preview"
-        fi
-      else
-        fail "dylint toolchain ($dylint_pinned)"
-        info "run bin/bootstrap, or: rustup toolchain install $dylint_pinned --component rustc-dev --component rust-src --component llvm-tools-preview"
-      fi
-    fi
   else
     fail "rustup"
     info "cannot check toolchain components without it"
@@ -233,8 +193,6 @@ check_bootstrap_deps() {
   report_tool cargo-udeps optional    # nightly-only, thorough unused-deps check
   report_tool cargo-release optional
   report_tool cargo-semver-checks optional
-  report_tool cargo-dylint required   # runs .lints/rust-quality-dylint/
-  report_tool dylint-link required    # linker cargo-dylint's lint crates need
 }
 
 # =============================================================================
@@ -273,7 +231,7 @@ check_updates() {
   echo "-- Bootstrap-installed CLI tools --"
   if [[ "$(uname -s)" == "Darwin" ]] && command_exists brew; then
     local outdated
-    outdated=$(brew outdated --formula 2>/dev/null | grep -E '^(direnv|taplo|typos-cli|ast-grep|git-cliff|lefthook|betterleaks|cocogitto)\b' || true)
+    outdated=$(brew outdated --formula 2>/dev/null | grep -E '^(direnv|taplo|typos-cli|git-cliff|lefthook|betterleaks|cocogitto)\b' || true)
     if [[ -n "$outdated" ]]; then
       warn "Homebrew tools"
       echo "$outdated" | sed 's/^/         /'

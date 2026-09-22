@@ -40,33 +40,16 @@ it has never actually executed, no matter how carefully it was written.
 
 ## How to run this check
 
-1. **Find every skip.** Both forms below are now mechanized as `ast-grep`
-   rules (see `.ast-grep/README.md` — `no-skipped-tests.yml`,
-   `no-silent-env-skip.yml`) rather than hand-derived greps:
+1. **Find every skip.**
    ```bash
-   ast-grep scan -c .ast-grep/sgconfig.yml services crates hosts
+   grep -rn '#\[ignore' --include="*.rs" services crates tests
    ```
-   This catches `#[ignore]`/`#[ignore = "..."]` anywhere, and the narrower
-   silent-env-skip shape (`if env::var($X).is_err() { ...return... }` inside a
-   `#[test]`/`#[tokio::test]`/`#[*::test]`-attributed function — scoped that
-   way so a legitimate production feature-flag guard isn't flagged).
-   **Enforced in `lefthook.yml`'s pre-commit hook** — a real violation
-   already fails the commit on its own, as long as hooks are installed and
-   nobody bypasses with `--no-verify`. The matching CI step exists in
-   `.github/workflows/ci.yml` but is currently disabled (`if: false`, to cut
-   CI overhead for a single-developer repo), so this isn't a fully
-   un-bypassable gate — running it here during a full sweep is a real second
-   check, not just a formality.
-
-   One shape stays a manual grep — the rules can't cross-reference a crate's
-   default-feature set, so a test module gated behind a non-default
-   `#[cfg(feature = "...")]` isn't caught mechanically:
+   Also check for the subtler forms:
    ```bash
-   grep -rln '#\[cfg(feature' --include="*.rs" services crates | xargs grep -l 'mod tests\|#\[test\]'
+   grep -rn 'return;.*// *skip\|if .*env::var.*is_err().*return' --include="*.rs" services crates
    ```
-   Confirm by hand whether the named feature is on by default; if not, this
-   is the same invisible-skip problem in different clothes (see "What this
-   check does NOT flag" below).
+   An early `return` guarded on a missing env var is a skip that does not even
+   announce itself.
 
 2. **Classify each one.** For every hit, answer: *what would it take to make
    this run?* Against the table above, almost always the answer is a mechanical
@@ -104,8 +87,6 @@ it has never actually executed, no matter how carefully it was written.
 ## What this check does NOT flag
 
 - ` ```no_run ` doctests — they compile and type-check, which is the point
-  (and doctests inside `///` comments are outside `no-skipped-tests.yml`'s
-  `.rs`-syntax matching entirely, not just intentionally excluded)
 - `#[cfg(feature = "...")]` on a test **module**, *provided* the feature is on by
   default or the workspace build enables it. If it is not, the tests are skipped
   in exactly the way this check exists to catch, and it should be reported — a

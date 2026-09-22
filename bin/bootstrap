@@ -28,12 +28,8 @@
 #   Rust Toolchain:
 #   - Nightly toolchain (for rustfmt unstable features)
 #   - rustfmt, clippy components
-#   - The pinned nightly in .lints/rust-quality-dylint/rust-toolchain.toml,
-#     with the rustc-dev/rust-src/llvm-tools-preview components dylint's
-#     rustc_private lints need (a separate toolchain from the one above —
-#     see .lints/rust-quality-dylint/README.md for why)
 #
-#   Cargo Tools (global, ~/.cargo/bin):
+#   Cargo Tools:
 #   - cargo-nextest (fast test runner)
 #   - cargo-llvm-cov (code coverage)
 #   - cargo-deny (license/security checking)
@@ -43,14 +39,6 @@
 #   - cargo-watch (file watcher)
 #   - cargo-outdated (dependency updates)
 #   - cargo-machete (unused dependencies)
-#
-#   rust-quality tools (project-local, ./.cargo/bin — not ~/.cargo/bin;
-#   see install_local_rust_quality_tools()'s comment for why):
-#   - ast-grep (runs .ast-grep/'s rust-quality structural lint rules)
-#   - cargo-dylint, dylint-link (runs .lints/rust-quality-dylint/'s rust-quality lints)
-#
-#   Also builds .lints/rust-quality-dylint/'s lint libraries once, so the
-#   first real commit isn't the first time that toolchain/build path runs.
 #
 #   Git Hooks:
 #   - lefthook install (pre-commit + commit-msg hooks from lefthook.yml)
@@ -324,92 +312,6 @@ install_cargo_tools() {
 }
 
 # =============================================================================
-# Project-local rust-quality tools (Cross-Platform)
-# =============================================================================
-# ast-grep, cargo-dylint, and dylint-link install into ./.cargo/bin — not the
-# global ~/.cargo/bin every other Cargo tool above uses — so this workspace's
-# tool versions stay scoped to this checkout instead of a machine-wide
-# install shared (and potentially conflicting) with every other project.
-# .envrc adds ./.cargo/bin to PATH for interactive use; this function also
-# exports it for the rest of THIS script run, since the direnv hook that
-# would normally do that doesn't re-fire mid-script.
-install_local_rust_quality_tools() {
-  section "Installing rust-quality tools (project-local: ./.cargo/bin)"
-
-  local repo_root
-  repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-
-  local tools=(
-    ast-grep
-    cargo-dylint
-    dylint-link
-  )
-
-  local tool
-  for tool in "${tools[@]}"; do
-    cargo install "$tool" --locked --root "$repo_root/.cargo"
-    ok "$tool"
-  done
-
-  export PATH="$repo_root/.cargo/bin:$PATH"
-}
-
-# =============================================================================
-# dylint's pinned nightly toolchain (Cross-Platform)
-# =============================================================================
-# .lints/rust-quality-dylint/ is a separate Cargo workspace pinned to its own
-# nightly (see its rust-toolchain.toml and README.md) because dylint lints
-# compile against rustc's unstable rustc_private APIs, which the root
-# workspace's toolchain doesn't expose. Read the pin from that file instead
-# of hardcoding a date here, so this stays correct whenever that pin moves.
-setup_dylint_toolchain() {
-  section "Setting up dylint's pinned nightly toolchain"
-
-  local dylint_toolchain_file
-  dylint_toolchain_file="$(dirname "$0")/../.lints/rust-quality-dylint/rust-toolchain.toml"
-
-  if [[ ! -f "$dylint_toolchain_file" ]]; then
-    warn ".lints/rust-quality-dylint/rust-toolchain.toml not found — skipping"
-    return 0
-  fi
-
-  local pinned
-  pinned=$(grep -E '^channel' "$dylint_toolchain_file" | sed -E 's/.*"([^"]+)".*/\1/')
-
-  step "installing $pinned (rustc-dev, rust-src, llvm-tools-preview)"
-  rustup toolchain install "$pinned" \
-    --component rustc-dev --component rust-src --component llvm-tools-preview
-
-  ok "dylint toolchain ($pinned)"
-}
-
-# =============================================================================
-# Prebuild the rust-quality dylint lints (Cross-Platform)
-# =============================================================================
-# .lints/rust-quality-dylint/'s lints are wired into lefthook.yml/CI as commit
-# gates, so the first real commit after a fresh clone is the wrong moment to
-# discover the toolchain/component setup is broken, or to pay a ~20-30s
-# from-scratch compile mid-commit. Building here forces both to happen now,
-# as a smoke test: it fails loudly during bootstrap instead of silently
-# during someone's first commit.
-build_dylint_lints() {
-  section "Building rust-quality dylint lints"
-
-  local dylint_dir
-  dylint_dir="$(dirname "$0")/../.lints/rust-quality-dylint"
-
-  if [[ ! -d "$dylint_dir" ]]; then
-    warn ".lints/rust-quality-dylint/ not found — skipping"
-    return 0
-  fi
-
-  step "compiling lint libraries"
-  (cd "$dylint_dir" && cargo dylint --all)
-
-  ok "dylint lints built"
-}
-
-# =============================================================================
 # Git Hooks (Cross-Platform)
 # =============================================================================
 
@@ -459,9 +361,6 @@ main() {
   # Cross-platform Rust setup
   setup_rust_toolchain
   install_cargo_tools
-  install_local_rust_quality_tools
-  setup_dylint_toolchain
-  build_dylint_lints
 
   # Git hooks (needs lefthook from the platform setup above)
   install_git_hooks

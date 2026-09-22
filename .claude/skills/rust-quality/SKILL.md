@@ -8,80 +8,61 @@ allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Task
 
 Run targeted code quality and maintenance checks on Rust codebases. Each check is a focused prompt that scans, analyzes, and fixes a specific category of maintenance debt.
 
-> ## Check 33 is pre-commit enforced (CI enforcement exists but is off)
+> ## ⛔ Check 33 is MANDATORY and runs every time
 >
-> `#[ignore]` and the silent-env-skip shape are mechanized
-> (`.ast-grep/rules/no-skipped-tests.yml`, `no-silent-env-skip.yml` — see
-> `docs/specs/2026-09-21-rust-quality-mechanization-design.md`) and wired into
-> `lefthook.yml`'s `ast-grep` pre-commit command. A real violation fails the
-> commit on its own, *provided* hooks are installed and nobody commits with
-> `--no-verify`. The matching `.github/workflows/ci.yml` step exists but is
-> currently disabled (`if: false`) — deliberately, to cut CI overhead for a
-> single-developer repo — so there is no un-bypassable backstop the way there
-> would be with both layers on: a bypassed hook, a bot commit, or a web-UI
-> edit reaches `main` with nothing catching it until someone runs this skill
-> or `cargo clippy` by hand. The old version of this banner ("run it every
-> time, whatever else was asked") stays retired since lefthook covers the
-> common case, but that residual gap is real — re-enabling the CI step
-> closes it completely.
+> **`prompts/33-no-skipped-tests.md` is not part of the menu.** Run it on every
+> invocation of this skill, whatever the user asked for, and report its findings
+> even when they asked for something unrelated. It is the one check whose
+> absence is self-concealing: a skipped test reports as healthy infrastructure
+> while asserting nothing, so no other check — and no green suite — can reveal
+> it.
 >
 > `#[ignore]` is banned in this workspace. The only exception is a doctest that
 > genuinely cannot execute, and even there prefer `no_run`. There is no
 > "requires a database" exemption: `#[sqlx::test]` provisions a throwaway
 > database per test.
 >
-> One shape is **not** mechanized and stays a manual check when this skill
-> runs #33 directly: a test module gated behind a `#[cfg(feature = "...")]`
-> that isn't on by default — confirming that needs the crate's default-feature
-> set, which a structural rule can't see. See `33-no-skipped-tests.md`.
+> This is non-negotiable. Do not ask whether to run it; do not skip it because
+> the user scoped the request narrowly; do not defer it as a follow-up.
 
 ## Available Checks
 
-| # | Check | Type | Prompt File | Mechanized |
-|---|-------|------|-------------|------------|
-| 1 | **Flaky Test Detection** | Code changes | `prompts/01-flaky-tests.md` | — |
-| 2 | **Regression Test Generation** | Code additions | `prompts/02-regression-tests.md` | — |
-| 3 | **Magic Number Audit** | Code changes | `prompts/03-magic-numbers.md` | — |
-| 4 | **Const Organization** | Code changes | `prompts/04-const-organization.md` | — |
-| 5 | **Invariant Analysis** | Documentation | `prompts/05-invariant-analysis.md` | — |
-| 6 | **Settings Documentation** | Documentation | `prompts/06-settings-documentation.md` | — |
-| 7 | **Crate Evaluation** | Analysis | `prompts/07-crate-evaluation.md` | — |
-| 8 | **Lock Analysis** | Code changes | `prompts/08-lock-analysis.md` | — |
-| 9 | **Dead Code Removal** | Code changes | `prompts/09-dead-code-removal.md` | — |
-| 10 | **Clone Analysis** | Code changes | `prompts/10-clone-analysis.md` | — |
-| 11 | **Zero-Copy Opportunities** | Code changes | `prompts/11-zero-copy-opportunities.md` | — |
-| 12 | **Function Decomposition** | Code changes | `prompts/12-function-decomposition.md` | — |
-| 13 | **Error Type Pattern** | Code changes | `prompts/13-error-pattern.md` | — |
-| 14 | **Structured Logging Compliance** | Code changes | `prompts/14-structured-logging.md` | — |
-| 15 | **Service Skeleton Consistency** | Analysis / Code changes | `prompts/15-skeleton-consistency.md` | — |
-| 16 | **Internal Route Isolation** | Code changes / Audit | `prompts/16-route-isolation.md` | — |
-| 17 | **Swallowed Errors** | Code changes | `prompts/17-swallowed-errors.md` | Partial — pattern 1 only, `dylint`, enforced in `lefthook.yml` (CI step exists, disabled) |
-| 18 | **Missing Metrics** | Code changes / Audit | `prompts/18-missing-metrics.md` | — |
-| 19 | **Garde Validation Coverage** | Code changes | `prompts/19-garde-validation.md` | — |
-| 20 | **Cache Eviction Hygiene** | Code changes / Audit | `prompts/20-cache-eviction.md` | — |
-| 21 | **Security Audit** | Code changes / Audit | `prompts/21-security.md` | — |
-| 22 | **Path Conventions** | Code changes | `prompts/22-path-conventions.md` | — |
-| 23 | **Error Messages** | Code changes | `prompts/23-error-messages.md` | — |
-| 24 | **Secret Types** | Code changes / Audit | `prompts/24-secret-types.md` | — |
-| 25 | **Service-to-Service Client Wiring** | Code changes / Audit | `prompts/25-s2s-client-wiring.md` | — |
-| 26 | **OpenAPI Security Accuracy** | Code changes / Audit | `prompts/26-openapi-security-accuracy.md` | — |
-| 27 | **Entity Field Naming (`created_by`)** | Code changes / Audit | `prompts/27-entity-field-naming.md` | — |
-| 28 | **Keyset Cursor & Pagination Contract** | Code changes / Audit | `prompts/28-cursor-pagination.md` | — |
-| 29 | **Authorization Guard (`require_*`) Consistency** | Code changes / Audit | `prompts/29-require-guard-consistency.md` | — |
-| 30 | **SQL Value Domains (`TEXT` + `CHECK`)** | Code changes / Audit | `prompts/30-sql-value-domains.md` | — |
-| 31 | **Relay Event Coverage** | Code changes / Audit | `prompts/31-relay-event-coverage.md` | — |
-| 32 | **Cross-Crate Duplication** | Code changes / Audit | `prompts/32-cross-crate-duplication.md` | — |
-| 33 | **No Skipped Tests** | Code changes / Audit | `prompts/33-no-skipped-tests.md` | Yes — `ast-grep`, enforced in `lefthook.yml` (CI step exists, disabled) |
-| 34 | **Handler Hygiene** | Code changes / Audit | `prompts/34-handler-hygiene.md` | — |
-
-"Mechanized" means a rule/lint exists, is proven against a fixture, and (for
-#17 and #33) is wired into `lefthook.yml`'s pre-commit hook — a real
-violation fails the commit without this skill being invoked at all. The
-matching `.github/workflows/ci.yml` steps exist but are currently disabled
-(`if: false`, to cut CI overhead for a single-developer repo) — see that
-file's comment for the tradeoff and how to re-enable. See `.ast-grep/README.md`
-and `.lints/rust-quality-dylint/README.md` for exact commands to run either by
-hand.
+| # | Check | Type | Prompt File |
+|---|-------|------|-------------|
+| 1 | **Flaky Test Detection** | Code changes | `prompts/01-flaky-tests.md` |
+| 2 | **Regression Test Generation** | Code additions | `prompts/02-regression-tests.md` |
+| 3 | **Magic Number Audit** | Code changes | `prompts/03-magic-numbers.md` |
+| 4 | **Const Organization** | Code changes | `prompts/04-const-organization.md` |
+| 5 | **Invariant Analysis** | Documentation | `prompts/05-invariant-analysis.md` |
+| 6 | **Settings Documentation** | Documentation | `prompts/06-settings-documentation.md` |
+| 7 | **Crate Evaluation** | Analysis | `prompts/07-crate-evaluation.md` |
+| 8 | **Lock Analysis** | Code changes | `prompts/08-lock-analysis.md` |
+| 9 | **Dead Code Removal** | Code changes | `prompts/09-dead-code-removal.md` |
+| 10 | **Clone Analysis** | Code changes | `prompts/10-clone-analysis.md` |
+| 11 | **Zero-Copy Opportunities** | Code changes | `prompts/11-zero-copy-opportunities.md` |
+| 12 | **Function Decomposition** | Code changes | `prompts/12-function-decomposition.md` |
+| 13 | **Error Type Pattern** | Code changes | `prompts/13-error-pattern.md` |
+| 14 | **Structured Logging Compliance** | Code changes | `prompts/14-structured-logging.md` |
+| 15 | **Service Skeleton Consistency** | Analysis / Code changes | `prompts/15-skeleton-consistency.md` |
+| 16 | **Internal Route Isolation** | Code changes / Audit | `prompts/16-route-isolation.md` |
+| 17 | **Swallowed Errors** | Code changes | `prompts/17-swallowed-errors.md` |
+| 18 | **Missing Metrics** | Code changes / Audit | `prompts/18-missing-metrics.md` |
+| 19 | **Garde Validation Coverage** | Code changes | `prompts/19-garde-validation.md` |
+| 20 | **Cache Eviction Hygiene** | Code changes / Audit | `prompts/20-cache-eviction.md` |
+| 21 | **Security Audit** | Code changes / Audit | `prompts/21-security.md` |
+| 22 | **Path Conventions** | Code changes | `prompts/22-path-conventions.md` |
+| 23 | **Error Messages** | Code changes | `prompts/23-error-messages.md` |
+| 24 | **Secret Types** | Code changes / Audit | `prompts/24-secret-types.md` |
+| 25 | **Service-to-Service Client Wiring** | Code changes / Audit | `prompts/25-s2s-client-wiring.md` |
+| 26 | **OpenAPI Security Accuracy** | Code changes / Audit | `prompts/26-openapi-security-accuracy.md` |
+| 27 | **Entity Field Naming (`created_by`)** | Code changes / Audit | `prompts/27-entity-field-naming.md` |
+| 28 | **Keyset Cursor & Pagination Contract** | Code changes / Audit | `prompts/28-cursor-pagination.md` |
+| 29 | **Authorization Guard (`require_*`) Consistency** | Code changes / Audit | `prompts/29-require-guard-consistency.md` |
+| 30 | **SQL Value Domains (`TEXT` + `CHECK`)** | Code changes / Audit | `prompts/30-sql-value-domains.md` |
+| 31 | **Relay Event Coverage** | Code changes / Audit | `prompts/31-relay-event-coverage.md` |
+| 32 | **Cross-Crate Duplication** | Code changes / Audit | `prompts/32-cross-crate-duplication.md` |
+| 33 | **No Skipped Tests** | Code changes / Audit | `prompts/33-no-skipped-tests.md` |
+| 34 | **Handler Hygiene** | Code changes / Audit | `prompts/34-handler-hygiene.md` |
 
 ## Check Categories
 
@@ -188,12 +169,10 @@ After all checks complete, provide a summary:
 
 When running all checks, execute in this order for best results:
 
-0. **No Skipped Tests (#33)** — always, and first, even though it's now
-   CI/pre-commit enforced (see the banner above) — a full sweep should still
-   confirm the suite it reasons about actually runs, rather than trusting
-   that nobody committed with `--no-verify`. Run
-   `ast-grep scan -c .ast-grep/sgconfig.yml services crates hosts` first and
-   triage its output.
+0. **No Skipped Tests (#33)** — always, and first. Every check below reasons
+   about a suite it assumes runs; this is the one that establishes whether it
+   does. Finding dead code or missing metrics in a service whose tests never
+   execute is measuring the wrong thing.
 1. **Magic Number Audit (#3)** — Clearest immediate improvements
 2. **Const Organization (#4)** — Naturally follows magic number extraction
 3. **Dead Code Removal (#9)** — Reduces surface area before deeper analysis
@@ -215,12 +194,7 @@ When running all checks, execute in this order for best results:
 18. **Service Skeleton Consistency (#15)** — Audit and converge `main.rs`/`config.rs`/`metrics.rs` across services
 19. **Internal Route Isolation (#16)** — Verify internal routes never reach the public listener
 20. **Authorization Guard Consistency (#29)** — Guard-shape audit, pairs with the route/security checks just run
-21. **Swallowed Errors (#17)** — Surface hidden failures before deeper analysis.
-    Pattern 1 (`let _ = <Result>`) has a proven `dylint` lint, enforced in
-    `lefthook.yml` (CI step exists, disabled) — run
-    `cargo dylint --all --path .lints/rust-quality-dylint --pattern '*'` from
-    the repo root first and triage its output; patterns 2-9 are still fully
-    this prompt's judgment call.
+21. **Swallowed Errors (#17)** — Surface hidden failures before deeper analysis
 22. **Missing Metrics (#18)** — Audit observability coverage of boundary operations
 23. **Garde Validation Coverage (#19)** — Verify input validation completeness, especially typed-ID nil rejection where this workspace has one
 24. **Entity Field Naming (#27)** — Same field-level audit class as #19, different concern
