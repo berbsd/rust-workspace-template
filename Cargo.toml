@@ -40,7 +40,7 @@ license     = "{{LICENSE}}"
 publish     = false
 readme      = "README.md"
 repository  = "{{REPO_URL}}"
-version     = "0.1.6"
+version     = "0.2.0"
 
 [workspace.metadata]
 

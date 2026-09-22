@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-09-22
+
+### Bug Fixes
+
+- Match .git/target at any depth in Zed's file_scan_exclusions
+
+### Features
+
+- Drop bundled example, scaffold empty services/hosts/jobs/workers
+
 ## [0.1.6] - 2026-09-22
 
 ### Bug Fixes
