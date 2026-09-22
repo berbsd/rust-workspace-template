@@ -96,7 +96,7 @@ After scanning, compare event constants across services. Flag the same semantic 
 ```bash
 cargo check --workspace
 cargo clippy --workspace --no-deps --all-targets
-cargo test --workspace
+cargo nextest run --workspace --all-features
 ```
 
 If a fix changes a log call's shape, also check log-based dashboards or alerts that may reference the old field/event name and surface them in the report — don't silently break observability.

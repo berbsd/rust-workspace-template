@@ -67,4 +67,4 @@ fn regression_single_byte_input_returns_incomplete() {
 3. **Propose tests** — For each fix, write a regression test with explanation
 4. **Present for review** — Show the proposed tests to the user before adding them
 5. **Add tests** — Place them in the appropriate test module (unit tests near the code, integration tests in `tests/`)
-6. **Verify** — Run `cargo test` to confirm the new tests pass
+6. **Verify** — Run `just check` (or `cargo nextest run --all-features` after `just db-ensure`) to confirm the new tests pass

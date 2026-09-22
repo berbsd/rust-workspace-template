@@ -2,6 +2,12 @@
 
 Keep the `require_*` guard family consistent in **shape** and free of **inconsiderate duplication** across `services/` and `crates/`. This is about how precondition/authorization guards are written and reused — not about whether a given check is the *correct* authorization (that is `16-route-isolation` and `21-security`).
 
+This check applies once a service has at least one `require_*` guard.
+`services/example` is a single public CRUD resource with no auth layering at
+all (same baseline as `16-route-isolation` and `21-security`), so it has none
+today — this check is a no-op on an unmodified template. Run it once the
+workspace grows its first `require_*` guard.
+
 ## Why
 
 The platform's north star is that "a developer who knows one service can read any other without relearning anything." `require_*` is the platform's agreed name for a guard that enforces a precondition and errors if it fails. When one guard returns `bool`, the next `Result<(), _>`, and a third `Result<Membership, _>` with no stated reason, every call site has to relearn the contract — and the compiler stops being able to enforce "the check ran." Worse, when the *same* precondition is copy-pasted into several guards or inlined at several call sites, the copies drift: one gets a fix (a newly-forbidden state, a tightened role) and the others silently keep allowing it. For an authorization check, a drifted duplicate is a security hole, not a tidiness nit. Clippy cannot see any of this.

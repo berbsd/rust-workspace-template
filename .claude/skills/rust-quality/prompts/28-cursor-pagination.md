@@ -79,7 +79,7 @@ Any deviation from `KeysetCursor` (workflow step 1's exception) must be raised w
 ```bash
 cargo check --workspace --all-targets --all-features
 cargo clippy --workspace --no-deps --all-targets --all-features
-cargo test --workspace
+cargo nextest run --workspace --all-features
 ```
 
 Prefer a per-service round-trip test proving wire stability after a raw-`Uuid` → typed-ID cursor change: encode a cursor, decode it, assert the ID round-trips. For the limit contract, a test that requests `limit = MAX_LIMIT + 1` and asserts `400 Bad Request` (not a clamped `200 OK`) locks the behaviour in.

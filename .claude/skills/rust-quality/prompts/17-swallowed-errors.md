@@ -132,7 +132,7 @@ After fixes:
 ```bash
 cargo check --workspace
 cargo clippy --workspace --no-deps --all-targets
-cargo test --workspace
+cargo nextest run --workspace --all-features
 ```
 
 If a fix changes a function signature (e.g. now returns `Result<T, E>` where it was returning `T`), update callers in the same pass. Don't ship a half-converted function whose error type widens silently.

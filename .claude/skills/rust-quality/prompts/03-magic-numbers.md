@@ -87,7 +87,7 @@ Place constants at the narrowest scope that covers all usage:
 3. **Name** — Propose a `const` name for each, following Rust conventions
 4. **Place** — Determine the appropriate scope for each constant
 5. **Replace** — Extract the constant and replace all occurrences
-6. **Verify** — Run `cargo check` after each file, `cargo test` after all changes
+6. **Verify** — Run `cargo check` after each file, `just check` after all changes
 7. **Report** — Summarize: number of magic numbers found, constants created, files modified
 
 ## Watch Out For

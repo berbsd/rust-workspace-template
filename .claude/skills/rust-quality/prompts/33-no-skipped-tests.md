@@ -66,12 +66,14 @@ it has never actually executed, no matter how carefully it was written.
    saying so is honest. Leaving it as decoration is not.
 
 5. **Verify it actually ran.** Converting is not enough; confirm the count went
-   up:
+   up. This workspace runs tests through nextest, not bare `cargo test` — its
+   summary line reports `skipped`, not `test result: ... N ignored`:
    ```bash
-   cargo test -p <crate> 2>&1 | grep 'test result'
+   just db-ensure && cargo nextest run -p <crate> --all-features 2>&1 | grep 'Summary'
    ```
-   `N ignored` must be `0`. A conversion that leaves the test filtered out for a
-   different reason has changed nothing.
+   The `skipped` count in that line must be `0`. A conversion that leaves the
+   test filtered out for a different reason (a non-default feature gate, a
+   nextest filter in `.config/nextest.toml`) has changed nothing.
 
 ## Report format
 

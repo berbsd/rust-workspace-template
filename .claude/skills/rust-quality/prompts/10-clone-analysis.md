@@ -123,7 +123,7 @@ Mark these as **justified** in the report:
 3. **Categorize** — Unnecessary, optimizable, or justified
 4. **Report** — Present findings with the format above
 5. **Fix** — Apply changes for unnecessary and optimizable clones (with user approval)
-6. **Verify** — `cargo check` and `cargo test` after changes
+6. **Verify** — `cargo check` and `just check` after changes
 
 ## Function Signature Improvements
 

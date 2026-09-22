@@ -2,6 +2,14 @@
 
 Verify that `main.rs`, `config.rs`, and the metrics module follow the same shape across every service. Domain logic and routes will differ — the bootstrap, configuration, and metric-registration scaffolding must not.
 
+This template's own `services/example` has neither `config.rs` nor a metrics
+module today — `main.rs` reads `DATABASE_URL`/`PORT` directly, and no metrics
+crate is wired in (see AGENTS.md's "Service anatomy" and `18-missing-metrics`).
+The `config.rs`/metrics checklists below describe the shape to converge on
+*once* the workspace adopts one of those patterns; on an unmodified template
+they don't apply yet, and the `main.rs` checklist is the only one with
+something to compare.
+
 ## Why
 
 Skeleton drift is the leading cause of bugs that exist in one service but silently don't in another: a missing tracing init layer, a different config-loading helper, a metrics counter registered in one service and not in others. Auditing periodically keeps services interchangeable from an operational perspective.
@@ -14,13 +22,18 @@ For every directory under `services/`, compare:
 - `services/<name>/src/config.rs`
 - `services/<name>/src/metrics.rs` (or `src/metrics/mod.rs` / wherever metric definitions live)
 
-If a service is missing one of these files, that's the first finding.
+If a service that has adopted `config.rs` or a metrics module is missing one the others have, that's the first finding for that service. A service that has adopted neither yet (matching AGENTS.md's documented baseline) is not a finding by itself.
 
 ## Workflow
 
 ### 1. Pick a reference service
 
-Identify the service with the most recently-touched, most complete skeleton. That becomes the reference shape. (Don't invent a new ideal — use what already works in the codebase.)
+Needs 2+ services with the file in question before there's anything to diff.
+With a single service (`services/example` today), there is no drift to report
+for `config.rs`/metrics — skip straight to confirming `main.rs` matches its
+own checklist below, and note in the report that skeleton drift-comparison
+resumes once a second service exists. (Don't invent a new ideal — use what
+already works in the codebase.)
 
 ### 2. Diff each other service against the reference
 
@@ -50,7 +63,7 @@ instead of via its own `router(pool)` function, or skipping graceful shutdown wi
 - Root struct named `Config`, derives `Clone, Debug, Deserialize, Validate`.
 - Every leaf field carries an `/// Env: `VAR` (default … | required)` line, and every nested-config field an `/// Env prefix:` line — flag missing lines, and flag any surviving `# Environment Variables` table on the struct, which this convention replaces (a table on the struct outlives the fields it describes; a `///` line on each field can't drift from it).
 - Fields use `#[serde(rename = "...")]` to define env var prefixes consistently with other services — whatever prefix convention this workspace's `Config` types already use (e.g. `service`, `postgres`, and any other shared sub-config).
-- Shared sub-configs (`ServiceConfig`, `PostgresConfig`, `HttpClientConfig`, etc.) come from the workspace crates listed in CLAUDE.md — not redefined locally.
+- Shared sub-configs (`ServiceConfig`, `PostgresConfig`, `HttpClientConfig`, etc.), if the workspace has any, come from wherever AGENTS.md documents them living — not redefined locally. This template has none yet; don't invent the names above as if they already exist here.
 - Every field carries `#[garde(...)]` (or `#[garde(skip)]` with justification) — no silent omissions.
 - No service-specific override of `Default` for shared types — defaults live in the owning crate.
 
@@ -82,7 +95,7 @@ After fixes:
 ```bash
 cargo check --workspace
 cargo clippy --workspace --no-deps --all-targets
-cargo test --workspace
+cargo nextest run --workspace --all-features
 ```
 
 Run each affected service locally (`just run <name>`) to confirm startup logs, metrics endpoint, and config loading still work.

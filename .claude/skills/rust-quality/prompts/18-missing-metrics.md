@@ -4,7 +4,7 @@ Cross-reference each service's `metrics.rs` against its actual boundary function
 
 ## Why
 
-Metrics are the cheapest way to catch a regression: a counter or histogram that doesn't fire for the new code path is a silent failure. This workspace's pattern is one `metrics.rs` per service that registers every metric the service emits, plus standard names so dashboards and alerts can be written generically.
+Metrics are the cheapest way to catch a regression: a counter or histogram that doesn't fire for the new code path is a silent failure. This template's intended pattern is one `metrics.rs` per service that registers every metric the service emits, plus standard names so dashboards and alerts can be written generically — but as of this writing `services/example` has not adopted it, so the first run of this check on an unmodified template produces exactly one finding (see the Report format example below), not a multi-service drift report.
 
 ## Conventions (recap)
 
@@ -14,7 +14,7 @@ From the workspace naming contract:
 - Counters: `{prefix}_{operation}_total` for success, `{prefix}_{operation}_failed_total` (or matching) for failure.
 - Histograms: `{prefix}_{operation}_duration_seconds`.
 - All registration lives in `services/<name>/src/metrics.rs` (or `metrics/mod.rs`). Inline registration scattered through handlers/services is a finding.
-- The `metrics` crate is the workspace standard. `prometheus`, `opentelemetry`, hand-rolled atomics in handlers — all findings.
+- No metrics crate is wired into this template yet. If the workspace has picked one, every service must use the same one — flag any service pulling in a second (`prometheus`, `opentelemetry`, hand-rolled atomics in handlers) once a first choice exists. If none is chosen yet, choosing one is out of scope for this check; flag it as a prerequisite instead of picking on the workspace's behalf.
 
 ## Workflow
 
@@ -41,7 +41,7 @@ For each service, enumerate the operations that warrant metrics. The general sta
 | Background job (cleanup, sync)    | `{prefix}_{job}_run_total`           | `{prefix}_{job}_run_failed_total`          | `{prefix}_{job}_duration_seconds` |
 | Cache lookup                      | gauge or counter `{prefix}_cache_hit_total` / `_miss_total` | — | — |
 
-If a shared crate already provides one of these (e.g. HTTP request metrics via a tower layer), don't duplicate it; instead confirm the layer is wired into the service's router. This template has no such shared crate today — each service wires its own metrics directly (see CLAUDE.md).
+If a shared crate already provides one of these (e.g. HTTP request metrics via a tower layer), don't duplicate it; instead confirm the layer is wired into the service's router. This template has no such shared crate today — each service wires its own metrics directly (see AGENTS.md).
 
 ### Step 3: Cross-reference
 
@@ -92,12 +92,25 @@ Per-service table:
 
 ```
 services/example
-  Registered metrics:    example_widget_created_total, example_widget_validated_total, example_request_duration_seconds
-  Missing:
-    - example_widget_deleted_total      (delete handler at handler/delete.rs:45 has no counter)
-    - example_upstream_request_failed_total (client failures unobserved)
-  Naming drift:
-    - "example_widget_created_total" vs "widget_create_total" elsewhere — pick a canonical form
+  Registered metrics:    none — no metrics.rs (or metrics/mod.rs) exists
+  Finding: create/list/delete handlers in feature/widget/ have no counters or
+    histograms; the service is currently unobservable. Establishing metrics.rs
+    is a prerequisite for the rest of this check, not something to fix inline
+    here — flag it and stop for this service.
 ```
 
-End with a workspace summary listing operations missing metrics in 2+ services (likely a gap worth solving once, in a shared crate, if the workspace has grown one — see CLAUDE.md's guidance on when a shared crate is warranted).
+Once a service has an established `metrics.rs`, per-service findings and
+cross-service drift look like this (illustrative — substitute the workspace's
+actual service/metric names):
+
+```
+services/widget-service
+  Registered metrics:    widget_created_total, widget_validated_total, widget_request_duration_seconds
+  Missing:
+    - widget_deleted_total          (delete handler at handler/delete.rs:45 has no counter)
+    - widget_upstream_request_failed_total (client failures unobserved)
+  Naming drift:
+    - "widget_created_total" vs "create_widget_total" elsewhere — pick a canonical form
+```
+
+End with a workspace summary listing operations missing metrics in 2+ services (likely a gap worth solving once, in a shared crate, if the workspace has grown one — see AGENTS.md's guidance on when a shared crate is warranted).

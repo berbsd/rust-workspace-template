@@ -243,7 +243,7 @@ After fixes:
 ```bash
 cargo check --workspace --all-targets --all-features
 cargo clippy --workspace --no-deps --all-targets --all-features
-cargo test --workspace
+cargo nextest run --workspace --all-features
 ```
 
 For changes touching crypto or token generation, run `cargo audit` (or `cargo deny check advisories`) and report transitive findings.

@@ -70,7 +70,7 @@ After changes:
 ```bash
 cargo clippy --workspace --all-targets --no-deps
 cargo check --workspace
-cargo test --workspace
+cargo nextest run --workspace --all-features
 ```
 
 All three must pass with zero warnings on the affected crates.

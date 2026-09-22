@@ -95,7 +95,7 @@ where the type really is the caller's private business.
 ```bash
 cargo build --workspace --all-targets --all-features
 cargo clippy --workspace --all-targets --all-features
-cargo test --workspace --lib
+cargo nextest run --workspace --lib --all-features
 ```
 
 Expect unused imports after removing a copy (`tracing::{error, warn}` usually);

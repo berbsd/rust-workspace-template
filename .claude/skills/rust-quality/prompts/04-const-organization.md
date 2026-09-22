@@ -57,7 +57,7 @@ Check the project's existing conventions:
 5. **Register** — Add `mod consts;` to the parent `mod.rs` or `lib.rs`
 6. **Migrate** — Replace original constant definitions with imports from `consts`
 7. **Deduplicate** — Flag constants with the same value but different names (potential bugs)
-8. **Verify** — Run `cargo check` and `cargo test`
+8. **Verify** — Run `cargo check` and `just check`
 
 ## Watch Out For
 

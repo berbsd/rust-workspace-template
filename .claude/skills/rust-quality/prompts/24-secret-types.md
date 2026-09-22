@@ -301,7 +301,7 @@ When a shared-crate type drops `Clone`, every consumer Config that embeds it los
 ```bash
 cargo check --workspace --all-targets --all-features
 cargo clippy --workspace --no-deps --all-targets --all-features
-cargo test -p <crate-under-test>
+cargo nextest run -p <crate-under-test> --all-features
 ```
 
 Per-crate tests should pin the wire contract (a test asserting the exact `Authorization` header value, or the exact HMAC signature bytes, is the model — it should pass after the wrap unchanged, because the signing primitive sees the same bytes either way).
@@ -333,7 +333,7 @@ After a Phase / per-struct change, the diff should show:
 - `Clone` and `Serialize` derives dropped where the contained type doesn't support them; standardized doc comment added.
 - `garde` annotations switched to `custom(...)` factory form.
 - Test fixtures construct via `SecretString::from(...)`.
-- `cargo test` passes — wire contracts unchanged.
+- `just check` passes — wire contracts unchanged.
 
 ## Report format
 

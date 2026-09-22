@@ -204,7 +204,7 @@ After fixes for a given crate/service:
 ```bash
 cargo check -p <crate-name> --all-targets --all-features
 cargo clippy -p <crate-name> --no-deps --all-targets --all-features
-cargo test -p <crate-name>
+cargo nextest run -p <crate-name> --all-features
 ```
 
 For workspace-wide impact:
@@ -212,7 +212,7 @@ For workspace-wide impact:
 ```bash
 cargo check --workspace --all-targets --all-features
 cargo clippy --workspace --no-deps --all-targets --all-features
-cargo test --workspace
+cargo nextest run --workspace --all-features
 ```
 
 Tests that assert on error message text will fail when the text changes — that's the point of running them. Update the assertions in the same commit; if a test asserts on the *old* text in a way that suggests the contract is the text itself, escalate to the user before changing.

@@ -177,7 +177,7 @@ Do not silently delete the `Validate` derive to make a warning go away — that'
 ```bash
 cargo check --workspace
 cargo clippy --workspace --no-deps --all-targets
-cargo test --workspace
+cargo nextest run --workspace --all-features
 ```
 
 For a richer check, write or extend an existing integration test that POSTs a payload containing `Uuid::nil()` for a typed ID field and asserts the response is `400 Bad Request` with `error_code = "VALIDATION_ERROR"`. One such test per service is enough; the contract is uniform.

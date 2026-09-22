@@ -1,6 +1,6 @@
 # Path Conventions
 
-Drive consistency with the 8 path-style rules in CLAUDE.md → **Path Conventions** across `crates/` and `services/`. Most rules are *not* lint-enforceable today — this prompt is the human/LLM substitute for clippy.
+Drive consistency with the 8 path-style rules in AGENTS.md → **Path Conventions** across `crates/` and `services/`. Most rules are *not* lint-enforceable today — this prompt is the human/LLM substitute for clippy.
 
 ## Why
 
@@ -9,14 +9,14 @@ clippy enforces wildcard imports (`wildcard_imports`, `enum_glob_use`) and a few
 ## Cross-references (do not duplicate)
 
 - **`use foo::*;` and `use Enum::*;` floor** — `clippy::wildcard_imports` and `clippy::enum_glob_use` are at `warn` in workspace lints. If clippy is clean, rule 7 is satisfied. This prompt owns the cases clippy *can't* see.
-- **`mod.rs` vs sibling-file layout** — owned by CLAUDE.md → Working Rules (and the parent skill's `15-skeleton-consistency.md`). Don't flag here.
+- **`mod.rs` vs sibling-file layout** — owned by AGENTS.md → Working Rules (and the parent skill's `15-skeleton-consistency.md`). Don't flag here.
 - **Router composition / `crate::router::*` shape** — owned by `16-route-isolation.md`. Don't flag here.
 
 ## Scope
 
 Scan all `*.rs` files in `crates/` and `services/`. Skip `target/`, `tests/e2e/`, and generated files (`*.gen.rs`, `OUT_DIR`).
 
-Run **one service or crate at a time**. Producing a workspace-wide finding list at once produces a diff too large to review safely; the convention is forward-looking and the sweep should follow the order from CLAUDE.md → Skills (shared crates first, then the reference service, then opportunistically as feature work touches each remaining service).
+Run **one service or crate at a time**. Producing a workspace-wide finding list at once produces a diff too large to review safely; the convention is forward-looking and the sweep should follow the order from AGENTS.md → Skills (shared crates first, then the reference service, then opportunistically as feature work touches each remaining service).
 
 ## Workflow
 
@@ -192,7 +192,7 @@ After fixes for a given crate/service:
 cargo +nightly fmt -p <crate-name>
 cargo check -p <crate-name> --all-targets --all-features
 cargo clippy -p <crate-name> --no-deps --all-targets --all-features
-cargo test -p <crate-name>
+cargo nextest run -p <crate-name> --all-features
 ```
 
 For workspace-wide impact (rare — only when touching shared crates):
@@ -201,7 +201,7 @@ For workspace-wide impact (rare — only when touching shared crates):
 cargo +nightly fmt
 cargo check --workspace --all-targets --all-features
 cargo clippy --workspace --no-deps --all-targets --all-features
-cargo test --workspace
+cargo nextest run --workspace --all-features
 ```
 
 If `cargo +nightly fmt` reorders imports in ways that conflict with the cleanup (it shouldn't, given the workspace's `group_imports = "StdExternalCrate"`), run fmt *first*, then re-grep — many findings will disappear.
@@ -224,4 +224,4 @@ rule | count | examples
 8    |   0   |
 ```
 
-Followed by a one-paragraph summary of which fixes were applied, which were left as documented exceptions, and any patterns you saw that suggest the *convention itself* needs amendment (escalate those — don't silently update CLAUDE.md from inside the sweep).
+Followed by a one-paragraph summary of which fixes were applied, which were left as documented exceptions, and any patterns you saw that suggest the *convention itself* needs amendment (escalate those — don't silently update AGENTS.md from inside the sweep).

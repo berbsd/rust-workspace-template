@@ -72,5 +72,5 @@ fn test_timeout_handler() {
 1. **Scan** — Search for the patterns above across all `#[test]` and `#[tokio::test]` functions
 2. **Categorize** — Group findings by flakiness type (timing, state, filesystem, network, env, ordering)
 3. **Fix** — Apply the appropriate fix for each finding
-4. **Verify** — Run `cargo test` to ensure all tests still pass
+4. **Verify** — Run `just check` (or `cargo nextest run --all-features` after `just db-ensure`) to ensure all tests still pass
 5. **Report** — List each fix with before/after and explanation of what made it flaky

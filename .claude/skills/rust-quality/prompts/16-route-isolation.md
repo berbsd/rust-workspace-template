@@ -65,7 +65,7 @@ For each service that has internal routes, verify a test exists that:
 
 Suggested location: `services/<name>/src/server/tests.rs` or `services/<name>/tests/route_isolation_it.rs`.
 
-Flag services with internal routes but no such test — that's the layer that catches new mistakes at `cargo test` time.
+Flag services with internal routes but no such test — that's the layer that catches new mistakes at test time.
 
 ### C. Lint/recipe presence
 

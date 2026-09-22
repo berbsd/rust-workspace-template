@@ -56,7 +56,7 @@ fn format_debug_output(state: &AppState) -> String {
 ### Phase 3: Verify
 
 1. `cargo check` — zero `dead_code` warnings, zero `#[allow(dead_code)]`
-2. `cargo test` — all tests pass (test-only code properly scoped)
+2. `just check` (or `cargo nextest run --all-features`) — all tests pass (test-only code properly scoped)
 3. `cargo check --all-features` — check feature-gated code too
 
 ## What NOT to Remove
@@ -84,7 +84,7 @@ While removing dead code, also address:
 4. **Evaluate** — For each warning: delete, `#[cfg(test)]`, or investigate
 5. **Apply** — Make the changes, compiling after each batch
 6. **Clean up** — Remove resulting unused imports and dependencies
-7. **Verify** — `cargo check` (zero warnings) + `cargo test` (all pass)
+7. **Verify** — `cargo check` (zero warnings) + `just check` (all pass)
 8. **Report** — Lines removed, items scoped to test, items kept with justification
 
 ## Watch Out For

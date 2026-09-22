@@ -118,5 +118,5 @@ For each lock found:
 2. **Analyze** — Evaluate each lock on the dimensions above
 3. **Categorize** — Group into: replace with atomic, replace with concurrent structure, keep as-is, fix (deadlock risk)
 4. **Apply** — Make recommended changes (skip "keep as-is" items)
-5. **Verify** — Run `cargo check` and `cargo test` after each change
+5. **Verify** — Run `cargo check` and `just check` after each change
 6. **Report** — Summarize findings with before/after for each change

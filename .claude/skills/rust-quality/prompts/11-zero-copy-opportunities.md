@@ -233,7 +233,7 @@ plain `json` columns preserve the textual difference between a
 3. **Prioritize** — Rank by: hot path frequency, data size, allocation count
 4. **Report** — Present findings grouped by impact
 5. **Fix** — Apply changes (high and medium impact first, with user approval)
-6. **Verify** — `cargo check` and `cargo test` after changes
+6. **Verify** — `cargo check` and `just check` after changes
 
 ## When NOT to Optimize
 

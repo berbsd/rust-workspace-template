@@ -114,7 +114,7 @@ For each finding, pick exactly one:
 ```bash
 cargo check --workspace --all-targets --all-features
 cargo clippy --workspace --no-deps --all-targets --all-features
-cargo test --workspace
+cargo nextest run --workspace --all-features
 ```
 
 ## Report format
