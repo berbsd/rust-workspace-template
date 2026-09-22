@@ -72,6 +72,27 @@ just run example       # run the example service locally
 
 See `AGENTS.md` for the working rules and workspace conventions this project follows.
 
+## Testing
+
+Integration tests and doc tests run against a real Postgres, not a mock — `just
+db-ensure` starts (or reuses) a local `sqlx-test-pg` Docker container and waits until
+it's accepting connections, exporting the `DATABASE_URL` tests read. `just check`
+already calls it for you; reach for these directly only when iterating on tests in
+isolation:
+
+```sh
+just db-ensure          # start/reuse local Postgres, wait until ready (needs Docker)
+just test               # full suite: cargo nextest run --all-features
+just test-unit          # library unit tests only — fast, no Docker required
+just test-db            # integration tests only — needs Docker running
+{% if keep_example -%}
+just test-crate example # tests for one crate/service
+{% else -%}
+just test-crate NAME    # tests for one crate/service
+{% endif -%}
+just pg-local-stop       # stop the local Postgres container when you're done
+```
+
 ## License
 
 Licensed under {{LICENSE}}; see [LICENSE](LICENSE).
