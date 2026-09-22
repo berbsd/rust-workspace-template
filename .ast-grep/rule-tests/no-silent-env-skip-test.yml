@@ -1,0 +1,47 @@
+id: no-silent-env-skip
+valid:
+  - |
+    fn production_feature_flag_guard() {
+        if env::var("ENABLE_BETA").is_err() {
+            return;
+        }
+        enable_beta_feature();
+    }
+  - |
+    #[test]
+    fn test_legit_conversion() {
+        if env::var("X").is_err() {
+            panic!("X must be set for this test");
+        }
+    }
+  - |
+    #[test]
+    fn test_uses_env_but_not_skip_shape() {
+        let key = env::var("API_KEY").unwrap_or_default();
+        assert_eq!(key, "");
+    }
+  - |
+    fn legitimate_early_return(x: Result<i32, Error>) -> i32 {
+        if x.is_err() {
+            return -1;
+        }
+        x.unwrap()
+    }
+invalid:
+  - |
+    #[test]
+    fn test_silent_skip() {
+        if env::var("API_KEY").is_err() {
+            return;
+        }
+        assert!(true);
+    }
+  - |
+    #[tokio::test]
+    async fn test_silent_skip_async() {
+        if std::env::var("API_KEY").is_err() {
+            // no key, skip
+            return;
+        }
+        assert!(true);
+    }

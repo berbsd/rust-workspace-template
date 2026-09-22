@@ -1,0 +1,11 @@
+# Pinned to the nightly `dylint_linting`/`cargo-dylint` 6.0.4 (the version this
+# sub-workspace's crates depend on) were built and tested against. This
+# toolchain provides the `rustc_private` compiler crates (`rustc_hir`,
+# `rustc_middle`, ...) the lints below use — the root workspace's
+# `rust-toolchain.toml` (a much newer stable) does not expose these at all.
+# Bumping `dylint_linting`/`dylint_testing` in swallowed_errors/Cargo.toml
+# without also re-checking this pin is the most likely way this whole
+# sub-workspace silently stops building.
+[toolchain]
+channel = "nightly-2026-05-28"
+components = ["llvm-tools-preview", "rustc-dev", "rust-src"]

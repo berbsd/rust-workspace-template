@@ -5,7 +5,8 @@
 # Documentation: https://github.com/evilmartians/lefthook
 #
 # Hooks configured:
-#   pre-commit:  Runs betterleaks, typos, rustfmt, and squawk on staged files
+#   pre-commit:  Runs betterleaks, typos, ast-grep, rust-quality-dylint,
+#                rustfmt, and squawk on staged files
 #   commit-msg:  Runs cogitto (cog) to enforce conventional commits
 #
 # Usage:
@@ -29,8 +30,12 @@ pre-commit:
   #
   # priority is mandatory with piped: lefthook orders alphabetically
   # otherwise, which can put an expensive check ahead of a cheap one for no
-  # reason. Ordered by cost, cheapest first: typos, betterleaks, rustfmt,
-  # squawk.
+  # reason. Ordered by cost, cheapest first: typos, betterleaks, ast-grep
+  # (structural pattern match, no compilation), rust-quality-dylint (the one
+  # command here that invokes the compiler — a `cargo dylint` cache miss is
+  # the slowest thing in this list, so it runs last among the Rust-specific
+  # checks, right before the two that mutate/scope by file type anyway),
+  # rustfmt, squawk.
   piped: true
   commands:
     betterleaks:
@@ -50,8 +55,25 @@ pre-commit:
         # `extend-exclude` is ignored when paths are passed explicitly.
         - ".claude/**"
       run: typos {staged_files}
-    rustfmt:
+    ast-grep:
       priority: 3
+      glob: "*.rs"
+      # Structural rules under .ast-grep/rules/ — see .ast-grep/README.md.
+      # Passing {staged_files} (not a hardcoded dir list) keeps this scoped
+      # to what's actually being committed, same as typos/rustfmt above.
+      run: ast-grep scan -c .ast-grep/sgconfig.yml {staged_files}
+    rust-quality-dylint:
+      priority: 4
+      glob: "*.rs"
+      # .lints/rust-quality-dylint/ — a separate Cargo workspace (own pinned
+      # nightly; see its README for why). --path/--pattern point at it
+      # without needing any [workspace.metadata.dylint] entry in the root
+      # Cargo.toml. Checks whole packages, not just staged files — `cargo
+      # dylint` has no staged-file scoping — so the glob above only controls
+      # whether this command runs at all, not what it checks.
+      run: cargo dylint --all --path .lints/rust-quality-dylint --pattern '*'
+    rustfmt:
+      priority: 5
       glob: "*.rs"
       # `rustfmt` on the staged files, not `cargo fmt` on the workspace.
       # `cargo fmt` takes no file scope: it reformats every dirty `.rs` file in
@@ -67,7 +89,7 @@ pre-commit:
       run: rustfmt +nightly --edition 2024 {staged_files}
       stage_fixed: true
     squawk:
-      priority: 4
+      priority: 6
       glob: "*.sql"
       run: npx squawk {staged_files}
 

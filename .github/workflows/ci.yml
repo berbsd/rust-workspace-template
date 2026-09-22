@@ -5,7 +5,8 @@
 # Mirrors `just check` locally: format, lint, test, typos, security.
 #
 # Jobs:
-#   check - Format, clippy, typos, cargo-deny
+#   check - Format, clippy, typos, cargo-deny (ast-grep/rust-quality-dylint
+#           steps exist but are disabled — `if: false` — see their comment)
 #   test  - Run tests with nextest
 #
 # Caching strategy:
@@ -53,6 +54,32 @@ jobs:
         with:
           components: rustfmt
 
+      # --- rust-quality (ast-grep / dylint) CI steps: disabled, kept in place ---
+      # Every step below down to "rust-quality-dylint (check #17 pattern 1)"
+      # carries `if: false`: too much CI overhead (a whole second nightly
+      # toolchain install + two from-source tool compiles) for a
+      # single-developer repo where `lefthook.yml`'s pre-commit hook already
+      # runs both checks locally on every commit. Re-enable by deleting the
+      # `if: false` lines once there's more than one contributor (or once
+      # lefthook bypass — `--no-verify`, a bot commit, a web-UI edit —
+      # becomes a real risk rather than a theoretical one).
+
+      # .lints/rust-quality-dylint/ pins its own nightly, separate from the
+      # two above — dylint lints compile against rustc's unstable
+      # rustc_private APIs, which need rustc-dev/rust-src/llvm-tools-preview
+      # components neither toolchain above carries. Plain `rustup toolchain
+      # install` (not the dtolnay/rust-toolchain action) so it doesn't
+      # change the job's default/active toolchain — `cargo dylint` resolves
+      # this pinned toolchain itself from .lints/rust-quality-dylint's own
+      # rust-toolchain.toml regardless of what's active. Read from that file
+      # rather than hardcoding the date, so this step can't drift from it.
+      - name: Install dylint's pinned nightly toolchain
+        if: false
+        run: |
+          pinned=$(grep -E '^channel' .lints/rust-quality-dylint/rust-toolchain.toml | sed -E 's/.*"([^"]+)".*/\1/')
+          rustup toolchain install "$pinned" \
+            --component rustc-dev --component rust-src --component llvm-tools-preview
+
       - name: Cache cargo registry and target
         uses: Swatinem/rust-cache@v2
         with:
@@ -63,6 +90,18 @@ jobs:
 
       - name: Install typos-cli
         uses: taiki-e/install-action@typos-cli
+
+      # Neither tool is in taiki-e/install-action's prebuilt-binary list
+      # (confirmed against its TOOLS.md), so this compiles from source —
+      # slower than the taiki-e installs above. Revisit if that cost becomes
+      # a real problem; cargo-binstall may cover one or both by then.
+      - name: Install ast-grep
+        if: false
+        run: cargo install ast-grep --locked
+
+      - name: Install cargo-dylint and dylint-link
+        if: false
+        run: cargo install cargo-dylint dylint-link --locked
 
       - name: Format check
         run: cargo +nightly fmt --check
@@ -75,6 +114,18 @@ jobs:
 
       - name: Security and license check
         run: cargo deny check
+
+      # rust-quality's mechanized checks (see
+      # docs/specs/2026-09-21-rust-quality-mechanization-design.md) — same
+      # commands `lefthook.yml`'s pre-commit hook runs, against the whole
+      # tree instead of just staged files.
+      - name: ast-grep (rust-quality checks)
+        if: false
+        run: ast-grep scan -c .ast-grep/sgconfig.yml services crates hosts
+
+      - name: rust-quality-dylint (check #17 pattern 1)
+        if: false
+        run: cargo dylint --all --path .lints/rust-quality-dylint --pattern '*'
 
   test:
     name: Test

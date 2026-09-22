@@ -20,6 +20,15 @@ target/
 # sccache cache directory (see .envrc)
 .sccache/
 
+# bin/bootstrap's project-local tool installs (ast-grep, cargo-dylint,
+# dylint-link) via `cargo install --root ./.cargo` — see .envrc. Ignoring
+# specific entries, not the whole .cargo/ directory, so a future root-level
+# .cargo/config.toml (this workspace already has one under
+# .lints/rust-quality-dylint/) stays trackable.
+/.cargo/bin/
+/.cargo/.crates.toml
+/.cargo/.crates2.json
+
 # Cargo.lock is tracked because this workspace contains binary services.
 # For library-only workspaces, uncomment to exclude it:
 # Cargo.lock

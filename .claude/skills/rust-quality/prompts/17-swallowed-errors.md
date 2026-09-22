@@ -27,6 +27,26 @@ let _: Result<(), CacheError> = self.cache.invalidate(key).await;
 
 Without the comment + typed binding, flag.
 
+**Mechanized (partially):** `.lints/rust-quality-dylint/swallowed_errors`
+(a `dylint` lint, not `ast-grep` — this needs the *type* of the discarded
+expression, which is semantic information no syntax-only tool has) flags the
+bare, untyped form. Run it with:
+```bash
+cargo dylint --all --path .lints/rust-quality-dylint --pattern '*'
+```
+**Enforced in `lefthook.yml`'s pre-commit hook** — a real violation of this
+pattern already fails the commit, as long as hooks are installed and nobody
+bypasses with `--no-verify`; the lint is declared `Deny` specifically so
+`cargo check` exits nonzero, not just `Warn` (a `Warn`-level dylint lint
+prints but exits 0 — verified the hard way, see
+`.lints/rust-quality-dylint/README.md`). The matching CI step exists in
+`.github/workflows/ci.yml` but is currently disabled (`if: false`, to cut CI
+overhead for a single-developer repo). It checks only the type-ascription
+half of the escape hatch (`let _: Result<T, E> = expr` silences it) — it does
+**not** verify the required explanatory comment is actually present, so a
+typed-but-uncommented discard still needs a human look. Nothing else about
+this pattern needs LLM judgment once the lint runs.
+
 ### 2. `.ok()` on `Result` without using the resulting `Option`
 
 ```rust

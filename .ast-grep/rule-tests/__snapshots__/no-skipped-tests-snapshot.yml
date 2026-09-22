@@ -1,0 +1,24 @@
+id: no-skipped-tests
+snapshots:
+  ? |
+    #[ignore]
+    #[test]
+    fn test_flaky_thing() {
+        assert_eq!(1, 1);
+    }
+  : labels:
+    - source: '#[ignore]'
+      style: primary
+      start: 0
+      end: 9
+  ? |
+    #[test]
+    #[ignore = "requires TEST_DATABASE_URL"]
+    fn test_widget_create() {
+        assert_eq!(1, 1);
+    }
+  : labels:
+    - source: '#[ignore = "requires TEST_DATABASE_URL"]'
+      style: primary
+      start: 8
+      end: 48

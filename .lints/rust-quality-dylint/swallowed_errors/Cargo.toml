@@ -1,0 +1,21 @@
+[package]
+name = "swallowed_errors"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "dylint lint for rust-quality check #17, pattern 1: `let _ = <Result-typed expr>`"
+
+[lib]
+crate-type = ["cdylib"]
+
+[lints]
+workspace = true
+
+[dependencies]
+dylint_linting = "6.0"
+
+[dev-dependencies]
+dylint_testing = "6.0"
+
+[package.metadata.rust-analyzer]
+rustc_private = true
