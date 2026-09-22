@@ -2,7 +2,7 @@
 # =============================================================================
 # check-commit-message — enforce subject/body line length
 # =============================================================================
-# `cog verify` (wired into lefthook.yml's commit-msg hook) checks Conventional
+# `cog verify` (wired into .lefthook.yml's commit-msg hook) checks Conventional
 # Commits structure — type, scope, colon, description — but nothing about
 # line length; cocogitto's cog.toml has no config surface for that at all.
 # This script is the other half: a subject over 72 characters, or a body line

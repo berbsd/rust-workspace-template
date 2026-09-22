@@ -41,7 +41,7 @@
 #   - cargo-machete (unused dependencies)
 #
 #   Git Hooks:
-#   - lefthook install (pre-commit + commit-msg hooks from lefthook.yml)
+#   - lefthook install (pre-commit + commit-msg hooks from .lefthook.yml)
 #
 # To add more tools:
 #   1. Add installation in the appropriate section below
@@ -315,7 +315,7 @@ install_cargo_tools() {
 # Git Hooks (Cross-Platform)
 # =============================================================================
 
-# Point git at the hooks lefthook.yml declares (pre-commit secret/typo/format
+# Point git at the hooks .lefthook.yml declares (pre-commit secret/typo/format
 # scanning, commit-msg conventional-commit check). Rewrites .git/hooks shims
 # from scratch every run, so it is safe to repeat.
 install_git_hooks() {

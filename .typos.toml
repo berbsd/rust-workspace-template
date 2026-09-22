@@ -1,5 +1,5 @@
 [files]
-# Mirrors lefthook.yml's per-command `exclude:` lists, which apply when
+# Mirrors .lefthook.yml's per-command `exclude:` lists, which apply when
 # {staged_files} is passed explicitly — that bypasses this file's excludes,
 # so a full/manual `typos` run stays quiet only if the same paths are listed
 # here too.

@@ -308,7 +308,7 @@ check_claude_integrations() {
 # 4. Tool readiness — git hooks actually installed
 # =============================================================================
 # The mechanical half of what the tool-readiness skill checks: are the hooks
-# lefthook.yml declares actually wired into .git/hooks, not just described in
+# .lefthook.yml declares actually wired into .git/hooks, not just described in
 # a config file nobody ran `lefthook install` against. The qualitative half —
 # do these hooks actually catch anything, or do they pass on everything — is
 # a judgment call for a model to make; this script can't run a skill, so it
@@ -344,10 +344,10 @@ check_git_hooks() {
     fi
   done
 
-  if [[ -f "$repo_root/lefthook.yml" ]]; then
-    ok "lefthook.yml"
+  if [[ -f "$repo_root/.lefthook.yml" ]]; then
+    ok ".lefthook.yml"
   else
-    fail "lefthook.yml"
+    fail ".lefthook.yml"
   fi
 
   echo ""
