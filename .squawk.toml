@@ -1,7 +1,7 @@
 # Squawk — Postgres migration linter
 # https://squawkhq.com/docs/
 
-pg_version = "16"
+pg_version = "18"
 
 # These migrations run on empty tables (initial setup), so concurrent index
 # creation and timeout settings are unnecessary.
