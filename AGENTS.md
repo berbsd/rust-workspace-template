@@ -13,9 +13,17 @@ service should be able to read any other without relearning anything. When you a
 change code, the question is not only "is this correct?" but "does this match how every
 other service does it?" Divergence is a defect even when it compiles.
 
-`services/example` is the living exemplar: one feature slice (`feature/widget`), the
-plain `adapter`/`domain`/`feature`/`port` shape. Follow it when scaffolding a new
-service; don't invent a second shape.
+Two sanctioned references, each with its own job — not two competing
+conventions. `services/example` is the minimal reference: one flat feature
+slice (`feature/widget/{model,handler,repository,error}.rs`) demonstrating
+the wire-level conventions — handler → repository, the shared error
+envelope, garde validation, keyset pagination — with the least possible
+ceremony. The `create-rust-service` skill (`.claude/skills/create-rust-service/`)
+is what actually scaffolds a new service or feature: a richer feature-first,
+hexagonal shape (`domain`/`port`/`service`/`adapter` per feature, plus a
+service-level `config.rs`/`module.rs`). Read `services/example` to learn the
+wire-level conventions; use the skill to build an actual service. Don't
+invent a third shape.
 
 ## Specs & plans
 
@@ -44,22 +52,39 @@ These apply to every task, not just coding tasks.
 
 ## Layout
 
-- `services/<name>/` — a service: `main.rs` (binary entrypoint), `lib.rs` (exposes a `router(pool)` function), `feature/<name>/` (one vertical slice per resource: `model.rs`, `handler.rs`, `repository.rs`, `error.rs`), `migrations/`, `tests/`. Auto-discovered via `services/*`. `services/example` is the living exemplar — copy its shape and swap `widget` for your first real feature.
+- `services/<name>/` — a service, scaffolded via the `create-rust-service` skill:
+  `main.rs`, `lib.rs`, `config.rs`, `module.rs`, `feature/<name>/{domain,port,service,error}.rs`
+  plus `feature/<name>/adapter/{http,postgres}.rs` per vertical slice, `migrations/`,
+  `tests/`. Auto-discovered via `services/*`. `services/example` stays the minimal,
+  flat-shaped reference described under "Architectural north star" — read it for the
+  wire-level conventions, but scaffold new services with the skill, not by copying its
+  file layout.
 - `hosts/<name>/` — binaries that compose multiple services' `router(pool)` functions into one deployable process (`.nest("/prefix", service::router(pool))` per member), purely for saving always-warm compute cost. Every service also stands alone (`cargo run -p <service>`) — a host is never required. `example-host` mounts `services/example` to demonstrate the pattern; see its `main.rs` doc comment for what mounting a second service takes.
 - `crates/<name>/` — workspace-wide libraries. Today just `common-types` (the shared API error envelope and keyset pagination helper) — there is no shared service framework in this template; each service depends on `axum`/`sqlx`/`tokio` directly rather than through a bootstrap layer. Add a crate here when logic is genuinely shared across 2+ services, not preemptively.
 - `bin/` — project scripts (on PATH via direnv): `bootstrap` installs the dev toolchain, `deploy`/`deploy_all` are placeholders for your own infrastructure.
-- **Adding a service**: scaffold `services/<name>/` following `services/example`'s shape, add its path to root `[workspace.dependencies]`.
+- **Adding a service**: run the `create-rust-service` skill
+  (`.claude/skills/create-rust-service/`) — it scaffolds the full shape and registers
+  the crate in root `[workspace.dependencies]`.
 - `jobs/<name>/` and `workers/<name>/` — neither directory exists yet, and the root `Cargo.toml` has no glob for either (Cargo fails on a glob whose directory is missing), so adding the first one means adding its glob too. `jobs/` is for a **one-off** run — an import, a backfill, a migration: finite input, run and done. `workers/` is for **ongoing** work — queue drains, sweeps, generation: triggered on demand and/or on a schedule, running forever in principle.
 - Root `Cargo.toml` — workspace deps + lints; `justfile` — task automation (`just check`, `just test`, `just fmt`).
 
 ## Service anatomy
 
-Every service follows the same shape (see `services/example`):
+Two shapes, each documented once rather than duplicated here:
 
-- **`main.rs`** — reads config from env vars directly (`DATABASE_URL`, `PORT`), connects a `sqlx::PgPool`, runs `sqlx::migrate!`, calls the crate's `router(pool)`, and serves it with `axum::serve`. No shared bootstrap crate — this is the whole of what a binary does.
-- **`lib.rs`** — exposes `pub fn router(pool: PgPool) -> Router`, the one function both the standalone binary and a composing host call.
-- **`feature/<name>/`** — one vertical slice per resource: `model.rs` (wire + domain types), `handler.rs` (extract → validate → delegate to the repository → respond), `repository.rs` (a trait plus a Postgres-backed impl — the seam for testing, even though this template's own tests prefer a real throwaway database over mocking it), `error.rs` (the feature's error enum, mapped onto `common_types::ApiErrorBody` via `impl_api_error_response!`).
-- Keep this shape when adding a feature. Reach for a shared crate under `crates/` only once two services genuinely need the same code — don't build one in advance of a second consumer.
+- **`services/example`** (minimal reference) — `main.rs` reads config from env vars
+  directly (`DATABASE_URL`, `PORT`), `lib.rs` exposes `pub fn router(pool: PgPool) ->
+  Router`, `feature/widget/{model,handler,repository,error}.rs` is one flat vertical
+  slice. Read it to learn the wire-level conventions (handler → repository, the error
+  envelope, garde validation, keyset pagination); don't copy its file layout for a new
+  service.
+- **A generated service** (the real shape) — `.claude/skills/create-rust-service/SKILL.md`'s
+  "Target shape" section is the source of truth: `config.rs`, `module.rs`, and a
+  `feature/<name>/{domain,port,service,error,adapter/{http,postgres}}.rs` slice per
+  resource. Use the skill to scaffold one; don't hand-write this shape from memory.
+
+Reach for a shared crate under `crates/` only once two services genuinely need the same
+code — don't build one in advance of a second consumer.
 
 ## Workspace Rules
 
@@ -89,10 +114,11 @@ is denied too.
 
 ## Skills
 
-Project skills live in `.claude/skills/`. Reach for `rust-documenter` when writing docs,
-the `rust-quality` prompts as the per-area contract (including handler hygiene, check
-#34), and `sql-analyzer` when reviewing queries/migrations. **Run
-`validate-implementation` before declaring work done.**
+Project skills live in `.claude/skills/`. Reach for `create-rust-service` to scaffold a
+new service or feature slice, `rust-documenter` when writing docs, the `rust-quality`
+prompts as the per-area contract (including handler hygiene, check #34), and
+`sql-analyzer` when reviewing queries/migrations. **Run `validate-implementation` before
+declaring work done.**
 
 Some `rust-quality` checks describe patterns this template doesn't have yet (a
 transactional outbox, a JWT revocation cache, service-to-service typed clients) — those
@@ -100,7 +126,7 @@ are conditional, skip them if the workspace has grown none of that.
 
 | Area | Source of truth |
 |---|---|
-| Service anatomy, file placement, the `main`/`lib`/`feature` shape | This file's "Service anatomy" section + `services/example` |
+| Service anatomy, file placement, the generated-service shape | `create-rust-service` skill's `SKILL.md` + this file's "Service anatomy" section |
 | Domain errors & API envelope, garde validation, error-message wording | `rust-quality` |
 | Rustdoc content — `///`/`//!` on every item, `# Errors`/`# Panics`/`# Safety` | `rust-documenter` skill |
 | OpenAPI / utoipa annotations, Scalar docs — optional in this template, `common-types` supports it behind the `openapi` feature but `services/example` doesn't enable it | `rust-documenter` skill's `references/openapi-annotations.md` |
