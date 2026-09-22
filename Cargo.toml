@@ -10,13 +10,16 @@
 # To add a new crate:
 #   1. Create the crate in crates/ (workspace-wide library), services/ (a
 #      service: schema + `router(pool)` + standalone binary — see
-#      services/example), hosts/ (binaries composing multiple services'
-#      routers — wiring only, no domain logic), jobs/ (a one-off run — an
-#      import, a backfill, a migration), or workers/ (ongoing work with no
-#      HTTP surface, triggered on demand and/or on a schedule). `jobs/` and
-#      `workers/` have no glob below until the first one is added — a members
-#      glob whose directory doesn't exist fails the whole workspace.
-#   2. It will be auto-discovered via the glob patterns below.
+#      AGENTS.md for the shape), hosts/ (binaries composing multiple
+#      services' routers — wiring only, no domain logic), jobs/ (a one-off
+#      run — an import, a backfill, a migration), or workers/ (ongoing work
+#      with no HTTP surface, triggered on demand and/or on a schedule).
+#      services/, hosts/, jobs/, and workers/ each carry a `.gitkeep` so the
+#      glob patterns below always have something to match — a glob matching
+#      zero filesystem entries fails the whole workspace, but Cargo is fine
+#      with a glob match that isn't a crate (it's silently skipped), so a
+#      lone `.gitkeep` keeps the directory real without being a member.
+#   2. New crates are auto-discovered via the glob patterns below.
 #
 # To add a new dependency:
 #   1. Add it to [workspace.dependencies] with version
@@ -24,7 +27,7 @@
 # =============================================================================
 
 [workspace]
-members  = ["crates/*", "hosts/*", "services/*"]
+members  = ["crates/*", "hosts/*", "services/*", "jobs/*", "workers/*"]
 resolver = "3"
 
 [workspace.package]
@@ -245,7 +248,6 @@ uninlined_format_args     = { level = "allow", priority = 3 }
 # record of where a crate lives — moving a crate edits its line here only.
 
 common-types = { path = "crates/common-types" }
-example      = { path = "services/example" }
 
 # --- external crates --------------------------------------------------------
 

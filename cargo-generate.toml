@@ -24,12 +24,23 @@ exclude = [".claude/skills/create-rust-service/**", ".cliff.toml"]
 # generated project — dropped here, then hooks/post.rhai renames
 # README.project.md into its place.
 #
+# CHANGELOG.md is this repo's own release history (git-cliff output from
+# this repo's commits) — meaningless in a fresh project. .cliff.toml (see
+# `exclude` above) still ships, so the generated project's own `bin/release`
+# generates its own CHANGELOG.md from scratch on its first release.
+#
+# hooks/ (this file's own [hooks].post script) is a cargo-generate control
+# file, not something a generated project needs — verified empirically that
+# ignoring it doesn't stop cargo-generate from running it (ignore only
+# affects what's copied to the final destination, not what the hook
+# mechanism reads from the template source during generation).
+#
 # .worktrees/** is this repo's own local git-worktree directory (gitignored,
 # never present in a real `--git` clone) — ignored so `cargo generate --path`
 # against a live checkout that happens to have one doesn't walk into
 # unrelated in-progress work and choke on whatever Liquid-unfriendly content
 # it contains. Purely a `--path`/local-testing concern; harmless otherwise.
-ignore = ["README.md", ".worktrees/**"]
+ignore = ["README.md", "CHANGELOG.md", "hooks/**", ".worktrees/**"]
 
 [placeholders]
 PROJECT_NAME = { type = "string", prompt = "Project display name (e.g. \"Acme Platform\")" }
@@ -56,10 +67,6 @@ METRIC_NAMESPACE = { type = "string", prompt = "Metrics namespace" }
 # comment. This regex enforces the same rule scaffold.sh used to enforce in
 # the wrapper script; now it's enforced at generation time instead.
 RUST_VERSION = { type = "string", prompt = "Rust toolchain version (X.Y.Z)", regex = "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
-keep_example = { type = "bool", prompt = "Keep the bundled example service (services/example + hosts/example-host)?", default = true }
-
-[conditional.'keep_example == false']
-ignore = ["services/example/**", "hosts/example-host/**"]
 
 [hooks]
 post = ["hooks/post.rhai"]

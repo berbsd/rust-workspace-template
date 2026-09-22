@@ -16,15 +16,13 @@ structure, is the driver.
 `hosts/<name>/src/main.rs` builds a pool per mounted service (each service still owns its
 own schema — nothing stops them sharing one physical database for a small deployment),
 calls each service's `router(pool)`, and `.nest("/prefix", ...)`s them together under one
-`axum::serve`. `example-host` mounts `services/example` under `/example` to demonstrate
-the pattern — see its `main.rs` doc comment for exactly what mounting a second service
-takes.
+`axum::serve`.
 
 Auto-discovered via `hosts/*` in the root `Cargo.toml`; builds through the same
-`docker/Dockerfile` as any service (`--build-arg SERVICE=example-host`).
+`docker/Dockerfile` as any service (`--build-arg SERVICE=<host-name>`).
 
 ## Adding a host
 
 Only when you actually have two or more low-traffic services worth bundling for Cloud Run
-cost. Scaffold `hosts/<name>/` following `example-host`'s shape, add its path to root
-`[workspace.dependencies]`, and add the services it mounts as dependencies.
+cost. Scaffold `hosts/<name>/`, add its path to root `[workspace.dependencies]`, and add
+the services it mounts as dependencies.

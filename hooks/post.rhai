@@ -37,21 +37,6 @@ for entry in substitutions {
     system::command("rm", ["-f", file + ".bak"]);
 }
 
-// Cargo.toml can't get the `{% if keep_example %}` treatment README.project.md
-// gets: it's real workspace config that must stay parseable Cargo.toml in
-// *this* repo too (Liquid tags inside it broke `cargo metadata` here
-// directly). So the members glob and the `example` dependency line are
-// edited in place instead, only when the example is dropped — mirrors what
-// this template's old scaffold.sh did with the same two sed edits.
-let keep_example = variable::get("keep_example");
-if keep_example == false {
-    let member_expr = "'s#members[[:space:]]+= \\[\"crates/\\*\", \"hosts/\\*\", \"services/\\*\"\\]#members  = [\"crates/*\"]#'";
-    system::command("sed", ["-i.bak", "-E", "-e", member_expr, "Cargo.toml"]);
-    let dep_line_expr = "'/^example[[:space:]]+= \\{ path = \"services\\/example\" \\}$/d'";
-    system::command("sed", ["-i.bak", "-E", "-e", dep_line_expr, "Cargo.toml"]);
-    system::command("rm", ["-f", "Cargo.toml.bak"]);
-}
-
 // README.md was already dropped by cargo-generate.toml's `ignore` list (it
 // documents the template itself, not a generated project). Move the real
 // generated-project README into its place.

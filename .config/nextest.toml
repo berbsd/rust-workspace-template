@@ -42,15 +42,15 @@ slow-timeout = { period = "60s", terminate-after = 5 }
 # individual tests if you move to a bigger CI runner and this doesn't bind.
 database = { max-threads = 8 }
 
-# No override wires a package into the `database` group by default — not
-# even `services/example`. `filter = 'package(...)'` is checked against the
-# real Cargo dependency graph at config-parse time, not at test-run time: if
-# it ever resolves to zero packages (e.g. the one listed package gets
-# deleted, as create-rust-workspace's `--no-example` scaffold option does),
-# `cargo nextest run` hard-errors before running a single test — confirmed
-# against this exact override. A package *missing* from an override is safe
-# (it just runs unbounded), but a package *named and then removed* is not, so
-# nothing disposable belongs in this file's committed defaults.
+# No override wires a package into the `database` group by default — this
+# template ships no services. `filter = 'package(...)'` is checked against
+# the real Cargo dependency graph at config-parse time, not at test-run
+# time: if it ever resolves to zero packages (e.g. the one listed package
+# gets deleted), `cargo nextest run` hard-errors before running a single
+# test — confirmed against this exact override. A package *missing* from an
+# override is safe (it just runs unbounded), but a package *named and then
+# removed* is not, so nothing disposable belongs in this file's committed
+# defaults.
 #
 # Add an override once a real, permanent service has at least one
 # `#[sqlx::test]`:

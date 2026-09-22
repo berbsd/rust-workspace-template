@@ -2,8 +2,9 @@
 
 Rust 2024 microservices workspace template: a `justfile`-driven, lint-heavy,
 feature-first-service starter, extracted from a production platform and stripped down to
-its generic bones — no shared service framework, no product-specific code, just the
-tooling and one real, working example.
+its generic bones — no shared service framework, no product-specific code, no bundled
+example, just the tooling. Scaffold your first service with the `create-rust-service`
+skill once generated.
 
 Most files here (`Cargo.toml`, `AGENTS.md`, …) are themselves templates — the `{{...}}`
 placeholders throughout get filled in by
@@ -20,18 +21,12 @@ one — during generation (see `hooks/post.rhai`).
   (`PaginatedResponse`, `Cursor`, `KeysetCursor`). Deliberately minimal — no auth types, no
   typed ids, no validation framework. Add to it only once two services genuinely need the
   same code.
-- **`services/example/`** — a real, self-contained CRUD service (`feature/widget`) built
-  directly on `axum`/`sqlx`/`tokio` — no shared bootstrap or middleware framework to depend
-  on. `main.rs` → `lib.rs`'s `router(pool)` → `feature/widget/{model,handler,repository,error}.rs`
-  is the whole shape — read it for the wire-level conventions (handler → repository, the
-  error envelope, garde validation, keyset pagination). Scaffold a new service or feature
-  with the `create-rust-service` skill rather than copying this file layout; it generates a
-  richer feature-first shape (`config.rs`, `module.rs`, per-feature `domain`/`port`/
-  `service`/`adapter`). 10 integration tests exercise `services/example` end-to-end against
-  a real Postgres.
-- **`hosts/example-host/`** — a binary that nests `example::router(pool)` under a path
-  prefix, demonstrating how multiple services would compose into one deployable process to
-  save on always-warm compute cost. Every service also stands alone — a host is optional.
+- **`services/`**, **`hosts/`**, **`jobs/`**, **`workers/`** — empty (each just carries a
+  `.gitkeep` so their `Cargo.toml` glob has something to match — see that file's header
+  comment). Scaffold a first service or feature with the `create-rust-service` skill,
+  which generates a feature-first shape (`main.rs` → `lib.rs`'s `router(pool)` →
+  per-feature `config.rs`/`module.rs`/`domain`/`port`/`service`/`adapter`) rather than
+  hand-copying a layout — see `AGENTS.md` for the full shape and conventions.
 - **`.claude/skills/`** — engineering-discipline skills: `create-rust-service`
   (scaffolds a new service or feature slice), `rust-quality` (including handler hygiene,
   check #34), `rust-documenter` (rustdoc, and OpenAPI/utoipa/Scalar annotations if the
@@ -45,7 +40,7 @@ one — during generation (see `hooks/post.rhai`).
   of the box, at lower rate limits; `export CONTEXT7_API_KEY=<key>` before launching your
   client for higher limits. Claude Code prompts for approval the first time a project's
   `.mcp.json` loads — decline it if you'd rather not use it.
-- **Tooling**: `justfile` (`just check`/`fmt`/`test`/`db-ensure`/…), `lefthook.yml`
+- **Tooling**: `justfile` (`just check`/`fmt`/`test`/`db-ensure`/…), `.lefthook.yml`
   (pre-commit secret scan, formatting, conventional commits — subject/body capped at 72
   chars via `bin/check-commit-message`, since `cog.toml` has no config surface for that),
   `bin/bootstrap` (installs the whole toolchain), `bin/doctor` (checks it's all still
@@ -62,10 +57,8 @@ one — during generation (see `hooks/post.rhai`).
   shared infrastructure as your own services actually need it.
 - `bin/deploy` / `bin/deploy_all` are stubs — deploy mechanics are specific to your
   infrastructure. Fill them in once you have a target.
-- No auth. `services/example` has no bearer-token or session layer — every route is
-  public. Add whatever auth your project needs; there's no framework assumption to work
+- No auth. Add whatever auth your project needs; there's no framework assumption to work
   around.
-- `jobs/` and `workers/` directories — created on demand; see `AGENTS.md`.
 
 ## Getting started
 
@@ -73,7 +66,6 @@ one — during generation (see `hooks/post.rhai`).
 ./bin/bootstrap       # installs rustup toolchain, just, lefthook, taplo, typos, etc.
 ./bin/doctor          # confirms everything installed cleanly and is up to date
 just check            # format check, clippy, tests, typos, cargo-deny
-just run example       # run the example service locally
 ```
 
 See `AGENTS.md` for the working rules and workspace conventions this template enforces.
@@ -81,6 +73,6 @@ See `AGENTS.md` for the working rules and workspace conventions this template en
 ## License
 
 Licensed under the Apache License, Version 2.0 (the "License"); see [LICENSE](LICENSE).
-This covers the template's own content (scaffolding, skills, example code). A project
+This covers the template's own content (scaffolding, skills, tooling). A project
 generated from this template picks its own license when scaffolded — see the `license`
 field in its `Cargo.toml`.
