@@ -135,3 +135,6 @@ TEST_DATA/
 .agents/
 
 AUDIT-*
+
+# Local git worktrees (not committed)
+.worktrees/
